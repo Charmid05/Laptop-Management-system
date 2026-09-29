@@ -1,21 +1,34 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { PageHeader, Panel, Stat, StatusBadge, tableCls } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { meta } from "@/lib/meta";
 import { useSession } from "@/lib/auth";
-import { revenueSeries } from "@/data/seed";
-import { invoiceTotals, money, patientName, todayISO, useDB } from "@/services/store";
+import {
+  fetchAnalytics, invoiceTotals, money, patientName, todayISO, useDB, type SeriesPoint,
+} from "@/services/store";
 
 export const Route = createFileRoute("/")({
   head: () => meta("Dashboard", "Today's appointments, queue, revenue and stock alerts at a glance."),
   component: () => <AppShell module="dashboard"><Dashboard /></AppShell>,
 });
 
+function useRevenueSeries(): SeriesPoint[] {
+  const [series, setSeries] = useState<SeriesPoint[]>([]);
+  useEffect(() => {
+    fetchAnalytics()
+      .then((a) => setSeries(a.weekly))
+      .catch((error: unknown) => console.error(error));
+  }, []);
+  return series;
+}
+
 function Dashboard() {
   const db = useDB();
   const { user } = useSession();
+  const revenueSeries = useRevenueSeries();
   const t = todayISO();
   const appts = db.appointments.filter((a) => a.date === t);
   const waiting = db.queue.filter((q) => q.date === t && (q.status === "waiting" || q.status === "checked_in"));

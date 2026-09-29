@@ -30,3 +30,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# SQLite database (recreated + seeded on backend start)
+db/*.db
+db/*.db-wal
+db/*.db-shm
