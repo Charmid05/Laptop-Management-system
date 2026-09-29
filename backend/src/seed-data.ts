@@ -1,9 +1,6 @@
 /**
- * Realistic sample data for demonstration only.
- *
- * NOTE FOR BACKEND IMPLEMENTATION: nothing here is persisted. Replace the
- * service functions in `src/services/` with real API calls; this file can then
- * be deleted. Shapes match `src/types`.
+ * Demonstration data loaded into SQLite the first time the backend starts
+ * against an empty database (see `./seed.ts`). Shapes match `./types.ts`.
  */
 
 import type {
@@ -25,7 +22,7 @@ import type {
   Role,
   Supplier,
   User,
-} from "@/types";
+} from "./types.ts";
 
 export const today = (): string => new Date().toISOString().slice(0, 10);
 
@@ -1174,23 +1171,3 @@ export const practiceSettings: PracticeSettings = {
   registrationNumber: "OB/OPT/2019/4471",
   kraPin: "P051884472K",
 };
-
-/** Revenue and visit history for dashboard/report charts. */
-export const revenueSeries = [
-  { label: "Mon", revenue: 42500, visits: 14, newPatients: 3, returning: 11 },
-  { label: "Tue", revenue: 58200, visits: 19, newPatients: 5, returning: 14 },
-  { label: "Wed", revenue: 36800, visits: 12, newPatients: 2, returning: 10 },
-  { label: "Thu", revenue: 71400, visits: 22, newPatients: 6, returning: 16 },
-  { label: "Fri", revenue: 63100, visits: 18, newPatients: 4, returning: 14 },
-  { label: "Sat", revenue: 28900, visits: 9, newPatients: 2, returning: 7 },
-  { label: "Sun", revenue: 12400, visits: 4, newPatients: 1, returning: 3 },
-];
-
-export const monthlySeries = [
-  { label: "Jan", revenue: 384000, visits: 142 },
-  { label: "Feb", revenue: 412500, visits: 158 },
-  { label: "Mar", revenue: 468900, visits: 171 },
-  { label: "Apr", revenue: 441200, visits: 164 },
-  { label: "May", revenue: 482300, visits: 186 },
-  { label: "Jun", revenue: 398700, visits: 149 },
-];

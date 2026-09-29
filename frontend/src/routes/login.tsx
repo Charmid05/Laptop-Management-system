@@ -19,11 +19,20 @@ function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (login(username, password)) navigate({ to: "/" });
-    else setError("Incorrect username or password.");
+    setBusy(true);
+    setError("");
+    try {
+      await login(username, password);
+      await navigate({ to: "/" });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not sign in.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -40,7 +49,7 @@ function LoginPage() {
         <p className="text-xs opacity-50">{db.settings.address}, {db.settings.town}</p>
       </div>
       <div className="flex items-center justify-center p-6">
-        <form onSubmit={submit} className="w-full max-w-sm space-y-5">
+        <form onSubmit={(e) => void submit(e)} className="w-full max-w-sm space-y-5">
           <div>
             <h2 className="text-3xl">Sign in</h2>
             <p className="mt-1 text-sm text-muted-foreground">Use your staff username and password.</p>
@@ -48,16 +57,19 @@ function LoginPage() {
           <Field label="Username or email"><Input value={username} onChange={(e) => setUsername(e.target.value)} autoFocus /></Field>
           <Field label="Password"><Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
           {error && <p className="text-sm text-danger">{error}</p>}
-          <Button type="submit" className="w-full rounded-full">Sign in</Button>
+          <Button type="submit" className="w-full rounded-full" disabled={busy}>
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
           <div className="rounded-xl border bg-muted p-4 text-xs text-muted-foreground">
-            <p className="mb-2 font-semibold text-foreground">Demo accounts (any password, 4+ characters)</p>
-            <div className="grid grid-cols-2 gap-1">
-              {db.users.filter((u) => u.status === "active").map((u) => (
-                <button type="button" key={u.id} className="text-left hover:text-foreground" onClick={() => { setUsername(u.username); setPassword("demo1234"); }}>
-                  <span className="font-mono">{u.username}</span> · {db.roles.find((r) => r.id === u.role)?.name.split(" ")[0]}
-                </button>
-              ))}
-            </div>
+            <p className="mb-2 font-semibold text-foreground">Administrator account</p>
+            <button
+              type="button"
+              className="text-left hover:text-foreground"
+              onClick={() => { setUsername("admin"); setPassword("1234"); }}
+            >
+              <span className="font-mono">admin</span> · password <span className="font-mono">1234</span>
+            </button>
+            <p className="mt-2">Sample staff accounts use the password <span className="font-mono">demo1234</span>.</p>
           </div>
         </form>
       </div>

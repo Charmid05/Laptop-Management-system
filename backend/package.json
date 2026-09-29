@@ -1,0 +1,13 @@
+{
+  "name": "amani-eye-backend",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "node src/index.ts",
+    "dev": "node --watch src/index.ts",
+    "reset": "node scripts/reset.ts"
+  }
+}

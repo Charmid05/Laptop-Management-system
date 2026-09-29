@@ -36,7 +36,7 @@ export function AppShell({ module, children }: { module: ModuleKey; children: Re
     if (ready && !user) navigate({ to: "/login" });
   }, [ready, user, navigate]);
 
-  if (!ready || !user) {
+  if (!ready || !user || !db.ready) {
     return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Loading…</div>;
   }
   const role = db.roles.find((r) => r.id === user.role);
