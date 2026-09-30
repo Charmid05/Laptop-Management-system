@@ -60,17 +60,6 @@ function LoginPage() {
           <Button type="submit" className="w-full rounded-full" disabled={busy}>
             {busy ? "Signing in…" : "Sign in"}
           </Button>
-          <div className="rounded-xl border bg-muted p-4 text-xs text-muted-foreground">
-            <p className="mb-2 font-semibold text-foreground">Administrator account</p>
-            <button
-              type="button"
-              className="text-left hover:text-foreground"
-              onClick={() => { setUsername("admin"); setPassword("1234"); }}
-            >
-              <span className="font-mono">admin</span> · password <span className="font-mono">1234</span>
-            </button>
-            <p className="mt-2">Sample staff accounts use the password <span className="font-mono">demo1234</span>.</p>
-          </div>
         </form>
       </div>
     </div>

@@ -8,9 +8,7 @@ import { create, saveSettings, type Entity, type ResourceName } from "./resource
 import * as data from "./seed-data.ts";
 
 export const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
-export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "1234";
-/** Password given to the sample staff accounts. */
-const STAFF_PASSWORD = "demo1234";
+export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin";
 
 const count = (table: string) => Number(one(`SELECT COUNT(*) AS n FROM ${table}`)!.n);
 
@@ -22,7 +20,7 @@ export function seedIfEmpty(): void {
   if (count("patients") === 0 && count("roles") === 0) {
     transaction(() => {
       insertAll("roles", data.roles);
-      for (const user of data.users) createUser(user as unknown as Entity, STAFF_PASSWORD);
+      for (const user of data.users) createUser(user as unknown as Entity, ADMIN_PASSWORD);
       insertAll("providers", data.insuranceProviders);
       insertAll("patients", data.patients);
       insertAll("appointments", data.appointments);
@@ -38,7 +36,7 @@ export function seedIfEmpty(): void {
       insertAll("audit", data.auditLogs);
       saveSettings(data.practiceSettings as unknown as Entity);
     });
-    console.log(`Seeded database with sample data (staff password "${STAFF_PASSWORD}").`);
+    console.log("Seeded database with initial data.");
   }
 
   ensureAdmin();
@@ -48,11 +46,11 @@ function ensureAdmin(): void {
   if (one("SELECT id FROM users WHERE username = ?", ADMIN_USERNAME)) return;
   createUser(
     {
-      id: "admin",
-      fullName: "System Administrator",
+      id: "u1",
+      fullName: "Admin",
       email: "admin@amanieye.co.ke",
       username: ADMIN_USERNAME,
-      phone: "0700 000 000",
+      phone: "0722 145 880",
       role: "administrator",
       status: "active",
       lastLogin: null,
