@@ -30,7 +30,6 @@ export type ModuleKey =
   | "dashboard"
   | "patients"
   | "appointments"
-  | "queue"
   | "clinical"
   | "prescriptions"
   | "invoices"
@@ -129,21 +128,6 @@ export interface Appointment {
   notes?: string;
   status: AppointmentStatus;
   createdAt: ISODateTime;
-}
-
-export interface QueueEntry {
-  id: string;
-  patientId: string;
-  appointmentId?: string;
-  queueNumber: number;
-  arrivalTime: string; // "08:52"
-  appointmentTime?: string;
-  clinicianId: string;
-  status: Extract<
-    AppointmentStatus,
-    "waiting" | "checked_in" | "in_consultation" | "completed" | "no_show"
-  >;
-  date: ISODate;
 }
 
 /* --------------------------------------------------------------- clinical */

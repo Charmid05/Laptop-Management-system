@@ -17,7 +17,6 @@ import type {
   PracticeSettings,
   Prescription,
   Product,
-  QueueEntry,
   RefractionValues,
   Role,
   Supplier,
@@ -48,7 +47,6 @@ export const roles: Role[] = [
       "dashboard",
       "patients",
       "appointments",
-      "queue",
       "clinical",
       "prescriptions",
       "invoices",
@@ -64,8 +62,8 @@ export const roles: Role[] = [
   {
     id: "receptionist",
     name: "Receptionist / Front Desk",
-    description: "Registers patients, books appointments and manages the queue.",
-    modules: ["dashboard", "patients", "appointments", "queue", "invoices"],
+    description: "Registers patients and books appointments.",
+    modules: ["dashboard", "patients", "appointments", "invoices"],
   },
   {
     id: "optometrist",
@@ -75,7 +73,6 @@ export const roles: Role[] = [
       "dashboard",
       "patients",
       "appointments",
-      "queue",
       "clinical",
       "prescriptions",
       "reports",
@@ -108,8 +105,6 @@ export const patients: Patient[] = [];
 const t = today();
 
 export const appointments: Appointment[] = [];
-
-export const queue: QueueEntry[] = [];
 
 const rx = (
   sphere: string,

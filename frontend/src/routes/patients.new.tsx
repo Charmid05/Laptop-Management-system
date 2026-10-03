@@ -254,7 +254,6 @@ function PatientRegistration() {
               <Textarea value={formData.notes} onChange={(e) => setFormData({ ...formData, notes: e.target.value })} rows={3} />
             </Field>
           </div>
-        </div>
 
         <div className="flex gap-3">
           <Button type="submit" disabled={loading} className="rounded-full">

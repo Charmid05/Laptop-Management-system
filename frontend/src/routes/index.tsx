@@ -11,7 +11,7 @@ import {
 } from "@/services/store";
 
 export const Route = createFileRoute("/")({
-  head: () => meta("Dashboard", "Today's appointments, queue, revenue and stock alerts at a glance."),
+  head: () => meta("Dashboard", "Today's appointments, revenue and stock alerts at a glance."),
   component: () => <AppShell module="dashboard"><Dashboard /></AppShell>,
 });
 
@@ -31,7 +31,6 @@ function Dashboard() {
   const revenueSeries = useRevenueSeries();
   const t = todayISO();
   const appts = db.appointments.filter((a) => a.date === t);
-  const waiting = db.queue.filter((q) => q.date === t && (q.status === "waiting" || q.status === "checked_in"));
   const revenueToday = db.payments.filter((p) => p.date.slice(0, 10) === t && p.status === "confirmed").reduce((s, p) => s + p.amount, 0);
   const outstanding = db.invoices.filter((i) => i.status !== "cancelled" && i.status !== "draft").reduce((s, i) => s + invoiceTotals(i, db).balance, 0);
   const lowStock = db.products.filter((p) => p.status === "active" && p.quantity <= p.reorderLevel);
@@ -47,9 +46,8 @@ function Dashboard() {
           <Button asChild className="rounded-full"><Link to="/appointments">Book appointment</Link></Button>
         </>}
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat label="Appointments today" value={appts.length} hint={`${appts.filter((a) => a.status === "completed").length} completed`} />
-        <Stat label="In the queue" value={waiting.length} hint="waiting or checked in" accent="info" />
         <Stat label="Collected today" value={money(revenueToday)} accent="accent" />
         <Stat label="Outstanding balances" value={money(outstanding)} hint={`${lowStock.length} stock alerts`} accent="ink" />
       </div>

@@ -2,7 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   BarChart3, Boxes, CalendarDays, ClipboardList, Eye, FileText, Glasses, LayoutDashboard,
-  ListOrdered, LogOut, Menu, Receipt, Search, Settings, ShieldCheck, Truck, Users, Wallet, X,
+  LogOut, Menu, Receipt, Search, Settings, ShieldCheck, Truck, Users, Wallet, X,
 } from "lucide-react";
 import type { ModuleKey } from "@/types";
 import { logout, useSession } from "@/lib/auth";
@@ -13,7 +13,6 @@ const nav: { to: string; label: string; icon: typeof Eye; module: ModuleKey }[] 
   { to: "/", label: "Dashboard", icon: LayoutDashboard, module: "dashboard" },
   { to: "/patients", label: "Patients", icon: Users, module: "patients" },
   { to: "/appointments", label: "Appointments", icon: CalendarDays, module: "appointments" },
-  { to: "/queue", label: "Patient queue", icon: ListOrdered, module: "queue" },
   { to: "/clinical", label: "Clinical visits", icon: Eye, module: "clinical" },
   { to: "/prescriptions", label: "Prescriptions", icon: Glasses, module: "prescriptions" },
   { to: "/invoices", label: "Invoices", icon: FileText, module: "invoices" },

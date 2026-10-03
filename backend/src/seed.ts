@@ -3,12 +3,12 @@
  * empty database, and always guarantees the `admin` account exists.
  */
 import { one, transaction } from "./db.ts";
-import { createUser } from "./auth.ts";
+import { createUser, setPassword, verifyPassword } from "./auth.ts";
 import { create, saveSettings, type Entity, type ResourceName } from "./resources.ts";
 import * as data from "./seed-data.ts";
 
 export const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
-export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "admin";
+export const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "1234";
 
 const count = (table: string) => Number(one(`SELECT COUNT(*) AS n FROM ${table}`)!.n);
 
@@ -24,7 +24,6 @@ export function seedIfEmpty(): void {
       insertAll("providers", data.insuranceProviders);
       insertAll("patients", data.patients);
       insertAll("appointments", data.appointments);
-      insertAll("queue", data.queue);
       insertAll("visits", data.visits);
       insertAll("prescriptions", data.prescriptions);
       insertAll("suppliers", data.suppliers);
@@ -43,7 +42,16 @@ export function seedIfEmpty(): void {
 }
 
 function ensureAdmin(): void {
-  if (one("SELECT id FROM users WHERE username = ?", ADMIN_USERNAME)) return;
+  const existing = one("SELECT id, passwordHash FROM users WHERE username = ?", ADMIN_USERNAME);
+  if (existing) {
+    const storedHash = String(existing.passwordHash ?? "");
+    if (!storedHash || !verifyPassword(ADMIN_PASSWORD, storedHash)) {
+      setPassword(String(existing.id), ADMIN_PASSWORD);
+      console.log(`Updated administrator "${ADMIN_USERNAME}" password to "${ADMIN_PASSWORD}".`);
+    }
+    return;
+  }
+
   createUser(
     {
       id: "u1",

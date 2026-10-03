@@ -85,19 +85,6 @@ CREATE TABLE IF NOT EXISTS appointments (
 );
 CREATE INDEX IF NOT EXISTS idx_appointments_date ON appointments(date);
 
-CREATE TABLE IF NOT EXISTS queue (
-  id              TEXT PRIMARY KEY,
-  patientId       TEXT NOT NULL REFERENCES patients(id) ON DELETE CASCADE,
-  appointmentId   TEXT REFERENCES appointments(id) ON DELETE SET NULL,
-  queueNumber     INTEGER NOT NULL,
-  arrivalTime     TEXT NOT NULL,
-  appointmentTime TEXT,
-  clinicianId     TEXT NOT NULL REFERENCES users(id),
-  status          TEXT NOT NULL DEFAULT 'waiting',
-  date            TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_queue_date ON queue(date);
-
 CREATE TABLE IF NOT EXISTS visits (
   id              TEXT PRIMARY KEY,
   visitNumber     TEXT NOT NULL UNIQUE,

@@ -86,7 +86,12 @@ function Appointments() {
     }
   };
 
-  const handleDeleteAppointment = async (id: string) => {
+  const handleDeleteAppointment = async (id?: string) => {
+    if (!id) {
+      toast.error("Appointment not found.");
+      return;
+    }
+
     if (!confirm("Delete this appointment?")) return;
     try {
       await deleteRecord("appointments", id);

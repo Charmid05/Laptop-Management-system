@@ -56,6 +56,8 @@ function Invoices() {
   const [patientSearch, setPatientSearch] = useState("");
   const [selectedInvoicePatient, setSelectedInvoicePatient] = useState("");
   const [selectedInvoicePatientName, setSelectedInvoicePatientName] = useState("");
+  const [includeTax, setIncludeTax] = useState(true);
+  const [taxRate, setTaxRate] = useState(db.settings.taxRate);
   const [saving, setSaving] = useState(false);
 
   const invoices = [...db.invoices].sort((a, b) => b.date.localeCompare(a.date));
@@ -77,9 +79,11 @@ function Invoices() {
 
   const [newInvoice, setNewInvoice] = useState({
     patientId: "",
-    items: [{ id: uid("ii"), description: "", quantity: 1, unitPrice: 0, discount: 0 }],
+    items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }],
     notes: "",
   });
+
+  const supplierOptions = db.suppliers;
 
   const filteredPatients = db.patients
     .filter(
@@ -98,9 +102,33 @@ function Invoices() {
       ...newInvoice,
       items: [
         ...newInvoice.items,
-        { id: uid("ii"), description: "", quantity: 1, unitPrice: 0, discount: 0 },
+        { id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 },
       ],
     });
+  };
+
+  const updateInvoiceItemSupplier = (index: number, supplierId: string) => {
+    const updated = [...newInvoice.items];
+    updated[index] = {
+      ...updated[index],
+      supplierId,
+      productId: "",
+      description: "",
+      unitPrice: 0,
+    };
+    setNewInvoice({ ...newInvoice, items: updated });
+  };
+
+  const updateInvoiceItemProduct = (index: number, productId: string) => {
+    const selectedProduct = db.products.find((product) => product.id === productId);
+    const updated = [...newInvoice.items];
+    updated[index] = {
+      ...updated[index],
+      productId,
+      description: selectedProduct?.name ?? updated[index].description,
+      unitPrice: selectedProduct?.sellingPrice ?? updated[index].unitPrice,
+    };
+    setNewInvoice({ ...newInvoice, items: updated });
   };
 
   const removeInvoiceItem = (index: number) => {
@@ -123,7 +151,7 @@ function Invoices() {
       !newInvoice.patientId ||
       newInvoice.items.some(
         (item) =>
-          !item.description.trim() ||
+          !(item.productId || item.description.trim()) ||
           item.quantity <= 0 ||
           item.unitPrice <= 0 ||
           item.discount < 0 ||
@@ -145,7 +173,7 @@ function Invoices() {
         patientId: newInvoice.patientId,
         date: todayISO(),
         items: newInvoice.items,
-        taxRate: db.settings.taxRate,
+        taxRate: includeTax ? taxRate : 0,
         status: "unpaid",
         notes: newInvoice.notes,
         createdBy: user.id,
@@ -156,9 +184,11 @@ function Invoices() {
       setShowNewDialog(false);
       setNewInvoice({
         patientId: "",
-        items: [{ id: uid("ii"), description: "", quantity: 1, unitPrice: 0, discount: 0 }],
+        items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }],
         notes: "",
       });
+      setIncludeTax(true);
+      setTaxRate(db.settings.taxRate);
       setPatientSearch("");
       navigate({ to: "/invoices/$id", params: { id: invoice.id } });
     } catch (error) {
@@ -195,7 +225,9 @@ function Invoices() {
                   setPatientSearch("");
                   setSelectedInvoicePatient("");
                   setSelectedInvoicePatientName("");
-                  setNewInvoice({ patientId: "", items: [{ id: uid("ii"), description: "", quantity: 1, unitPrice: 0, discount: 0 }], notes: "" });
+                  setIncludeTax(true);
+                  setTaxRate(db.settings.taxRate);
+                  setNewInvoice({ patientId: "", items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }], notes: "" });
                 }
               }}
             >
@@ -263,6 +295,33 @@ function Invoices() {
                     )}
                   </div>
 
+                  <div className="rounded-lg border bg-muted/20 p-3">
+                    <div className="flex items-center gap-3 mb-3">
+                      <label className="flex items-center gap-2 text-sm font-medium">
+                        <input
+                          type="checkbox"
+                          checked={includeTax}
+                          onChange={(e) => setIncludeTax(e.target.checked)}
+                        />
+                        Include {db.settings.taxLabel}
+                      </label>
+                      {includeTax && (
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.01"
+                            value={taxRate}
+                            onChange={(e) => setTaxRate(Number(e.target.value) || 0)}
+                            className="w-24"
+                          />
+                          <span className="text-sm text-muted-foreground">%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   <div>
                     <div className="flex items-center justify-between mb-2">
                       <label className="text-sm font-medium">Items *</label>
@@ -270,85 +329,129 @@ function Invoices() {
                         <Plus className="size-4" /> Add item
                       </Button>
                     </div>
-                    <div className="space-y-2">
-                      {newInvoice.items.map((item, index) => (
+                    <div className="space-y-3">
+                      {newInvoice.items.map((item, index) => {
+                        const availableProducts = item.supplierId
+                          ? db.products.filter(
+                              (product) =>
+                                product.status === "active" && product.supplierId === item.supplierId,
+                            )
+                          : [];
+
+                        return (
                         <div
                           key={item.id}
-                          className="grid grid-cols-2 items-end gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_7rem_6rem_auto]"
+                          className="rounded-lg border bg-muted/20 p-3"
                         >
-                          <div className="flex-1">
-                            <Field label="Description">
-                              <Input
-                                value={item.description}
-                                onChange={(e) =>
-                                  updateInvoiceItem(index, "description", e.target.value)
-                                }
-                                placeholder="Service or product"
-                              />
+                          <div className="grid gap-3 md:grid-cols-2">
+                            <Field label="Supplier">
+                              <select
+                                value={item.supplierId ?? ""}
+                                onChange={(e) => updateInvoiceItemSupplier(index, e.target.value)}
+                                className={selectCls}
+                              >
+                                <option value="">Select supplier</option>
+                                {supplierOptions.map((supplier) => (
+                                  <option key={supplier.id} value={supplier.id}>
+                                    {supplier.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </Field>
+
+                            <Field label="Product">
+                              <select
+                                value={item.productId ?? ""}
+                                onChange={(e) => updateInvoiceItemProduct(index, e.target.value)}
+                                className={selectCls}
+                                disabled={!item.supplierId}
+                              >
+                                <option value="">{item.supplierId ? "Select product" : "Select supplier first"}</option>
+                                {availableProducts.map((product) => (
+                                  <option key={product.id} value={product.id}>
+                                    {product.name} ({product.brand})
+                                  </option>
+                                ))}
+                              </select>
                             </Field>
                           </div>
-                          <div className="w-20">
-                            <Field label="Qty">
-                              <Input
-                                type="number"
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  updateInvoiceItem(
-                                    index,
-                                    "quantity",
-                                    parseInt(e.target.value) || 0,
-                                  )
-                                }
-                                min="1"
-                              />
-                            </Field>
+
+                          <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_5rem_7rem_6rem_auto] items-end">
+                            <div className="flex-1">
+                              <Field label="Description">
+                                <Input
+                                  value={item.description}
+                                  onChange={(e) =>
+                                    updateInvoiceItem(index, "description", e.target.value)
+                                  }
+                                  placeholder="Service or product"
+                                />
+                              </Field>
+                            </div>
+                            <div className="w-20">
+                              <Field label="Qty">
+                                <Input
+                                  type="number"
+                                  value={item.quantity}
+                                  onChange={(e) =>
+                                    updateInvoiceItem(
+                                      index,
+                                      "quantity",
+                                      parseInt(e.target.value) || 0,
+                                    )
+                                  }
+                                  min="1"
+                                />
+                              </Field>
+                            </div>
+                            <div className="w-28">
+                              <Field label="Price">
+                                <Input
+                                  type="number"
+                                  value={item.unitPrice}
+                                  onChange={(e) =>
+                                    updateInvoiceItem(
+                                      index,
+                                      "unitPrice",
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </Field>
+                            </div>
+                            <div className="w-20">
+                              <Field label="Discount">
+                                <Input
+                                  type="number"
+                                  value={item.discount}
+                                  onChange={(e) =>
+                                    updateInvoiceItem(
+                                      index,
+                                      "discount",
+                                      parseFloat(e.target.value) || 0,
+                                    )
+                                  }
+                                  min="0"
+                                  step="0.01"
+                                />
+                              </Field>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => removeInvoiceItem(index)}
+                              disabled={newInvoice.items.length === 1}
+                              className="text-destructive"
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
                           </div>
-                          <div className="w-28">
-                            <Field label="Price">
-                              <Input
-                                type="number"
-                                value={item.unitPrice}
-                                onChange={(e) =>
-                                  updateInvoiceItem(
-                                    index,
-                                    "unitPrice",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                min="0"
-                                step="0.01"
-                              />
-                            </Field>
-                          </div>
-                          <div className="w-20">
-                            <Field label="Discount">
-                              <Input
-                                type="number"
-                                value={item.discount}
-                                onChange={(e) =>
-                                  updateInvoiceItem(
-                                    index,
-                                    "discount",
-                                    parseFloat(e.target.value) || 0,
-                                  )
-                                }
-                                min="0"
-                                step="0.01"
-                              />
-                            </Field>
-                          </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => removeInvoiceItem(index)}
-                            disabled={newInvoice.items.length === 1}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="size-4" />
-                          </Button>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
 
@@ -367,17 +470,26 @@ function Invoices() {
                         (sum, item) => sum + item.quantity * item.unitPrice - item.discount,
                         0,
                       );
-                      const tax = (subtotal * db.settings.taxRate) / 100;
+                      const tax = includeTax ? (subtotal * taxRate) / 100 : 0;
                       return (
                         <div className="ml-auto grid max-w-xs grid-cols-2 gap-x-4 gap-y-1">
                           <span>Subtotal</span>
                           <span className="text-right">
                             {money(subtotal, db.settings.currency)}
                           </span>
-                          <span>
-                            {db.settings.taxLabel} ({db.settings.taxRate}%)
-                          </span>
-                          <span className="text-right">{money(tax, db.settings.currency)}</span>
+                          {includeTax ? (
+                            <>
+                              <span>
+                                {db.settings.taxLabel} ({taxRate}%)
+                              </span>
+                              <span className="text-right">{money(tax, db.settings.currency)}</span>
+                            </>
+                          ) : (
+                            <>
+                              <span>{db.settings.taxLabel}</span>
+                              <span className="text-right">{money(0, db.settings.currency)}</span>
+                            </>
+                          )}
                           <span className="font-semibold">Total</span>
                           <span className="text-right font-semibold">
                             {money(subtotal + tax, db.settings.currency)}
@@ -559,6 +671,11 @@ export function InvoiceDetail({ id }: { id: string }) {
   const totals = invoiceTotals(invoice, db);
   const payments = db.payments.filter((p) => p.invoiceId === id && p.status === "confirmed");
 
+  const openPaymentDialog = () => {
+    setPaymentAmount(String(Math.max(0, totals.balance)));
+    setShowPaymentDialog(true);
+  };
+
   const handleAddPayment = async () => {
     const amount = Number(paymentAmount);
     if (!user || !Number.isFinite(amount) || amount <= 0 || amount > totals.balance) {
@@ -637,7 +754,7 @@ export function InvoiceDetail({ id }: { id: string }) {
             </Button>
             {totals.balance > 0 && !["cancelled", "refunded"].includes(invoice.status) && (
               <Button
-                onClick={() => setShowPaymentDialog(true)}
+                onClick={openPaymentDialog}
                 disabled={!user}
                 className="rounded-full"
               >

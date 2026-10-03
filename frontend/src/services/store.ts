@@ -8,7 +8,7 @@ import { ApiError, api } from "./api";
 import type {
   Appointment, AuditLog, ClinicalVisit, EyeExamination, EyePair, InsuranceClaim,
   InsuranceProvider, InventoryTransaction, Invoice, ModuleKey, Patient, Payment,
-  PracticeSettings, Prescription, Product, QueueEntry, RefractionValues, Role,
+  PracticeSettings, Prescription, Product, RefractionValues, Role,
   Supplier, User,
 } from "@/types";
 
@@ -18,7 +18,6 @@ export interface Collections {
   providers: InsuranceProvider[];
   patients: Patient[];
   appointments: Appointment[];
-  queue: QueueEntry[];
   visits: ClinicalVisit[];
   prescriptions: Prescription[];
   suppliers: Supplier[];
@@ -58,7 +57,7 @@ export const defaultSettings: PracticeSettings = {
 };
 
 const empty = (): DB => ({
-  roles: [], users: [], providers: [], patients: [], appointments: [], queue: [],
+  roles: [], users: [], providers: [], patients: [], appointments: [],
   visits: [], prescriptions: [], suppliers: [], products: [], stock: [],
   invoices: [], payments: [], claims: [], audit: [],
   settings: defaultSettings,
@@ -155,8 +154,15 @@ export async function updateRecord<K extends CollectionName>(
 }
 
 export async function deleteRecord(name: CollectionName, id: string): Promise<void> {
-  await api(`/${name}/${id}`, { method: "DELETE" });
-  publish({ ...db, [name]: (db[name] as { id: string }[]).filter((r) => r.id !== id) } as DB);
+  if (!id) return;
+
+  try {
+    await api(`/${name}/${id}`, { method: "DELETE" });
+  } catch (error) {
+    if (!(error instanceof ApiError) || error.status !== 404) throw error;
+  }
+
+  publish({ ...db, [name]: (db[name] as { id?: string }[]).filter((r) => r.id !== id) } as DB);
 }
 
 export async function saveSettings(patch: Partial<PracticeSettings>): Promise<PracticeSettings> {

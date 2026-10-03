@@ -61,14 +61,6 @@ export const resources = {
       reason: t, notes: t, status: t, createdAt: t,
     },
   },
-  queue: {
-    table: "queue",
-    orderBy: "date DESC, queueNumber",
-    columns: {
-      id: t, patientId: t, appointmentId: t, queueNumber: "int",
-      arrivalTime: t, appointmentTime: t, clinicianId: t, status: t, date: t,
-    },
-  },
   visits: {
     table: "visits",
     orderBy: "date DESC",
