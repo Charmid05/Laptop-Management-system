@@ -64,6 +64,13 @@ export interface EmergencyContact {
   phone: string;
 }
 
+export interface NextOfKin {
+  name: string;
+  relationship: string;
+  phone: string;
+  address?: string;
+}
+
 export interface Patient {
   id: string;
   patientNumber: string;
@@ -80,6 +87,7 @@ export interface Patient {
   town: string;
   address?: string;
   emergencyContact: EmergencyContact;
+  nextOfKin?: NextOfKin;
   occupation?: string;
   referralSource?: string;
   insuranceProviderId?: string;

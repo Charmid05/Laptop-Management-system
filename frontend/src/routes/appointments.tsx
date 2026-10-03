@@ -22,6 +22,7 @@ function Appointments() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [selectedPatient, setSelectedPatient] = useState<string>("");
+  const [selectedPatientName, setSelectedPatientName] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const appointments = db.appointments.sort((a, b) => b.date.localeCompare(a.date));
@@ -39,13 +40,25 @@ function Appointments() {
 
   const filteredPatients = db.patients.filter((p) =>
     `${patientName(p)} ${p.patientNumber} ${p.phone}`.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 5);
+  ).slice(0, 8);
+
+  const showDropdown = searchQuery.length > 0 && !selectedPatient && filteredPatients.length > 0;
 
   const clinicians = db.users.filter((u) => u.role === "optometrist" && u.status === "active");
 
   const handleCreateAppointment = async () => {
     if (!newAppointment.patientId || !newAppointment.date || !newAppointment.time || !newAppointment.clinicianId || !newAppointment.reason) {
       toast.error("Please fill in all required fields");
+      return;
+    }
+
+    // Validate appointment date
+    const appointmentDate = new Date(newAppointment.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (appointmentDate < today) {
+      toast.error("Cannot book appointments in the past. Please select today or a future date.");
       return;
     }
 
@@ -100,7 +113,15 @@ function Appointments() {
         title="Appointments"
         subtitle={`${appointments.length} total appointments`}
         actions={
-          <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
+          <Dialog open={showNewDialog} onOpenChange={(open) => {
+            setShowNewDialog(open);
+            if (!open) {
+              setSelectedPatient("");
+              setSelectedPatientName("");
+              setSearchQuery("");
+              setNewAppointment({ patientId: "", date: todayISO(), time: "", clinicianId: "", type: "new_consultation", reason: "", notes: "" });
+            }
+          }}>
             <DialogTrigger asChild>
               <Button className="rounded-full"><Plus className="mr-2 size-4" /> Schedule appointment</Button>
             </DialogTrigger>
@@ -111,25 +132,52 @@ function Appointments() {
               <div className="space-y-4">
                 <div className="relative">
                   <label className="text-sm font-medium">Patient *</label>
-                  <Input
-                    placeholder="Search patient..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="mt-1"
-                  />
-                  {searchQuery && filteredPatients.length > 0 && (
-                    <div className="absolute left-0 right-0 top-20 z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                      {filteredPatients.map((p) => (
-                        <button
-                          key={p.id}
-                          onClick={() => { setSelectedPatient(p.id); setSearchQuery(patientName(p)); setNewAppointment({ ...newAppointment, patientId: p.id }); }}
-                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted"
-                        >
-                          <span className="font-medium">{patientName(p)}</span>
-                          <span className="ml-2 text-muted-foreground">{p.patientNumber}</span>
-                        </button>
-                      ))}
+                  {selectedPatient ? (
+                    <div className="mt-1 flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+                      <span className="flex-1 text-sm font-medium">{selectedPatientName}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedPatient("");
+                          setSelectedPatientName("");
+                          setNewAppointment({ ...newAppointment, patientId: "" });
+                          setSearchQuery("");
+                        }}
+                        className="text-muted-foreground hover:text-destructive text-xs underline"
+                      >
+                        Change
+                      </button>
                     </div>
+                  ) : (
+                    <>
+                      <Input
+                        placeholder="Type name, ID or phone..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="mt-1"
+                        autoComplete="off"
+                      />
+                      {showDropdown && (
+                        <div className="absolute left-0 right-0 top-[4.5rem] z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-56 overflow-y-auto">
+                          {filteredPatients.map((p) => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedPatient(p.id);
+                                setSelectedPatientName(patientName(p));
+                                setNewAppointment({ ...newAppointment, patientId: p.id });
+                                setSearchQuery("");
+                              }}
+                              className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted border-b last:border-0"
+                            >
+                              <span className="font-medium">{patientName(p)}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">{p.patientNumber} · {p.phone}</span>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
 
@@ -138,6 +186,7 @@ function Appointments() {
                     <Input
                       type="date"
                       value={newAppointment.date}
+                      min={todayISO()}
                       onChange={(e) => setNewAppointment({ ...newAppointment, date: e.target.value })}
                     />
                   </Field>

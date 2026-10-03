@@ -54,6 +54,8 @@ function Invoices() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [patientSearch, setPatientSearch] = useState("");
+  const [selectedInvoicePatient, setSelectedInvoicePatient] = useState("");
+  const [selectedInvoicePatientName, setSelectedInvoicePatientName] = useState("");
   const [saving, setSaving] = useState(false);
 
   const invoices = [...db.invoices].sort((a, b) => b.date.localeCompare(a.date));
@@ -87,7 +89,9 @@ function Invoices() {
           .toLowerCase()
           .includes(patientSearch.toLowerCase()),
     )
-    .slice(0, 5);
+    .slice(0, 8);
+
+  const showPatientDropdown = patientSearch.length > 0 && !selectedInvoicePatient && filteredPatients.length > 0;
 
   const addInvoiceItem = () => {
     setNewInvoice({
@@ -187,7 +191,12 @@ function Invoices() {
               open={showNewDialog}
               onOpenChange={(open) => {
                 setShowNewDialog(open);
-                if (!open) setPatientSearch("");
+                if (!open) {
+                  setPatientSearch("");
+                  setSelectedInvoicePatient("");
+                  setSelectedInvoicePatientName("");
+                  setNewInvoice({ patientId: "", items: [{ id: uid("ii"), description: "", quantity: 1, unitPrice: 0, discount: 0 }], notes: "" });
+                }
               }}
             >
               <DialogTrigger asChild>
@@ -202,32 +211,55 @@ function Invoices() {
                 <form onSubmit={(event) => void handleCreateInvoice(event)} className="space-y-4">
                   <div className="relative">
                     <label className="text-sm font-medium">Patient *</label>
-                    <Input
-                      placeholder="Search patient..."
-                      value={patientSearch}
-                      onChange={(e) => {
-                        setPatientSearch(e.target.value);
-                        setNewInvoice({ ...newInvoice, patientId: "" });
-                      }}
-                      className="mt-1"
-                    />
-                    {patientSearch && filteredPatients.length > 0 && (
-                      <div className="absolute left-0 right-0 top-20 z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                        {filteredPatients.map((p) => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              setPatientSearch(patientName(p));
-                              setNewInvoice({ ...newInvoice, patientId: p.id });
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted"
-                          >
-                            <span className="font-medium">{patientName(p)}</span>
-                            <span className="ml-2 text-muted-foreground">{p.patientNumber}</span>
-                          </button>
-                        ))}
+                    {selectedInvoicePatient ? (
+                      <div className="mt-1 flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+                        <span className="flex-1 text-sm font-medium">{selectedInvoicePatientName}</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSelectedInvoicePatient("");
+                            setSelectedInvoicePatientName("");
+                            setNewInvoice({ ...newInvoice, patientId: "" });
+                            setPatientSearch("");
+                          }}
+                          className="text-muted-foreground hover:text-destructive text-xs underline"
+                        >
+                          Change
+                        </button>
                       </div>
+                    ) : (
+                      <>
+                        <Input
+                          placeholder="Type name, ID or phone..."
+                          value={patientSearch}
+                          onChange={(e) => {
+                            setPatientSearch(e.target.value);
+                            setNewInvoice({ ...newInvoice, patientId: "" });
+                          }}
+                          className="mt-1"
+                          autoComplete="off"
+                        />
+                        {showPatientDropdown && (
+                          <div className="absolute left-0 right-0 top-[4.5rem] z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-56 overflow-y-auto">
+                            {filteredPatients.map((p) => (
+                              <button
+                                key={p.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedInvoicePatient(p.id);
+                                  setSelectedInvoicePatientName(patientName(p));
+                                  setNewInvoice({ ...newInvoice, patientId: p.id });
+                                  setPatientSearch("");
+                                }}
+                                className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted border-b last:border-0"
+                              >
+                                <span className="font-medium">{patientName(p)}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">{p.patientNumber} · {p.phone}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
 

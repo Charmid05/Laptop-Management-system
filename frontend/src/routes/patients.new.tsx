@@ -33,6 +33,10 @@ function PatientRegistration() {
     county: "",
     town: "",
     address: "",
+    nextOfKinName: "",
+    nextOfKinRelationship: "",
+    nextOfKinPhone: "",
+    nextOfKinAddress: "",
     emergencyContactName: "",
     emergencyContactRelationship: "",
     emergencyContactPhone: "",
@@ -48,6 +52,29 @@ function PatientRegistration() {
     if (!formData.firstName || !formData.lastName || !formData.dateOfBirth || !formData.gender || !formData.phone || !formData.county || !formData.town) {
       toast.error("Please fill in all required fields");
       return;
+    }
+
+    // Validate date of birth
+    const dob = new Date(formData.dateOfBirth);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    if (dob > today) {
+      toast.error("Date of birth cannot be in the future");
+      return;
+    }
+
+    const minAgeDate = new Date();
+    minAgeDate.setFullYear(minAgeDate.getFullYear() - 120);
+    if (dob < minAgeDate) {
+      toast.error("Invalid date of birth: age cannot exceed 120 years");
+      return;
+    }
+
+    const maxAgeDate = new Date();
+    maxAgeDate.setFullYear(maxAgeDate.getFullYear() - 18);
+    if (dob > maxAgeDate) {
+      toast.warning("Patient appears to be under 18 years old. Please verify the date of birth.");
     }
 
     setLoading(true);
@@ -72,6 +99,12 @@ function PatientRegistration() {
           relationship: formData.emergencyContactRelationship,
           phone: formData.emergencyContactPhone,
         },
+        nextOfKin: formData.nextOfKinName ? {
+          name: formData.nextOfKinName,
+          relationship: formData.nextOfKinRelationship,
+          phone: formData.nextOfKinPhone,
+          address: formData.nextOfKinAddress || undefined,
+        } : undefined,
         occupation: formData.occupation || undefined,
         referralSource: formData.referralSource || undefined,
         insuranceProviderId: formData.insuranceProviderId || undefined,
@@ -113,7 +146,14 @@ function PatientRegistration() {
               <Input value={formData.lastName} onChange={(e) => setFormData({ ...formData, lastName: e.target.value })} required />
             </Field>
             <Field label="Date of birth *">
-              <Input type="date" value={formData.dateOfBirth} onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })} required />
+              <Input
+                type="date"
+                value={formData.dateOfBirth}
+                max={todayISO()}
+                min={(() => { const d = new Date(); d.setFullYear(d.getFullYear() - 120); return d.toISOString().slice(0, 10); })()}
+                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                required
+              />
             </Field>
             <Field label="Gender *">
               <select
@@ -158,6 +198,22 @@ function PatientRegistration() {
 
         <div className="grid gap-6 md:grid-cols-2">
           <div className="space-y-4">
+            <h3 className="text-lg font-semibold">Next of kin</h3>
+            <Field label="Name">
+              <Input value={formData.nextOfKinName} onChange={(e) => setFormData({ ...formData, nextOfKinName: e.target.value })} />
+            </Field>
+            <Field label="Relationship">
+              <Input value={formData.nextOfKinRelationship} onChange={(e) => setFormData({ ...formData, nextOfKinRelationship: e.target.value })} />
+            </Field>
+            <Field label="Phone">
+              <Input value={formData.nextOfKinPhone} onChange={(e) => setFormData({ ...formData, nextOfKinPhone: e.target.value })} />
+            </Field>
+            <Field label="Address">
+              <Textarea value={formData.nextOfKinAddress} onChange={(e) => setFormData({ ...formData, nextOfKinAddress: e.target.value })} rows={2} />
+            </Field>
+          </div>
+
+          <div className="space-y-4">
             <h3 className="text-lg font-semibold">Emergency contact</h3>
             <Field label="Name *">
               <Input value={formData.emergencyContactName} onChange={(e) => setFormData({ ...formData, emergencyContactName: e.target.value })} required />
@@ -169,6 +225,7 @@ function PatientRegistration() {
               <Input value={formData.emergencyContactPhone} onChange={(e) => setFormData({ ...formData, emergencyContactPhone: e.target.value })} required />
             </Field>
           </div>
+        </div>
 
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Additional information</h3>

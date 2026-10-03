@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS patients (
   town                  TEXT NOT NULL DEFAULT '',
   address               TEXT,
   emergencyContact      TEXT NOT NULL DEFAULT '{}', -- JSON
+  nextOfKin             TEXT DEFAULT '{}', -- JSON
   occupation            TEXT,
   referralSource        TEXT,
   insuranceProviderId   TEXT REFERENCES insurance_providers(id),

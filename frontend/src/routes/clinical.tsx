@@ -44,6 +44,7 @@ function ClinicalVisits() {
   const db = useDB();
   const [showNewForm, setShowNewForm] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<string>("");
+  const [selectedPatientName, setSelectedPatientName] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
 
   const visits = db.visits.sort((a, b) => b.date.localeCompare(a.date));
@@ -105,7 +106,9 @@ function ClinicalVisits() {
         .toLowerCase()
         .includes(searchQuery.toLowerCase()),
     )
-    .slice(0, 5);
+    .slice(0, 8);
+
+  const showDropdown = searchQuery.length > 0 && !selectedPatient && filteredPatients.length > 0;
 
   return (
     <>
@@ -124,43 +127,75 @@ function ClinicalVisits() {
       {showNewForm && (
         <Panel className="mb-6">
           <h3 className="text-lg font-semibold mb-4">Start new clinical visit</h3>
-          <div className="flex gap-3 items-end">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
-              <Input
-                placeholder="Search patient..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
-              {searchQuery && filteredPatients.length > 0 && (
-                <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-48 overflow-y-auto">
-                  {filteredPatients.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => {
-                        setSelectedPatient(p.id);
-                        setSearchQuery(patientName(p));
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted"
-                    >
-                      <span className="font-medium">{patientName(p)}</span>
-                      <span className="ml-2 text-muted-foreground">{p.patientNumber}</span>
-                    </button>
-                  ))}
+          <div className="space-y-3">
+            <div className="relative">
+              {selectedPatient ? (
+                <div className="flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
+                  <Search className="size-4 text-muted-foreground shrink-0" />
+                  <span className="flex-1 text-sm font-medium">{selectedPatientName}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedPatient("");
+                      setSelectedPatientName("");
+                      setSearchQuery("");
+                    }}
+                    className="text-muted-foreground hover:text-destructive text-xs underline"
+                  >
+                    Change
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Type patient name, ID or phone..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                      autoComplete="off"
+                    />
+                  </div>
+                  {showDropdown && (
+                    <div className="absolute left-0 right-0 top-11 z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-56 overflow-y-auto">
+                      {filteredPatients.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedPatient(p.id);
+                            setSelectedPatientName(patientName(p));
+                            setSearchQuery("");
+                          }}
+                          className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted border-b last:border-0"
+                        >
+                          <span className="font-medium">{patientName(p)}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{p.patientNumber} · {p.phone}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
-            <Button onClick={handleCreateVisit} className="rounded-full">
-              Start visit
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setShowNewForm(false)}
-              className="rounded-full"
-            >
-              Cancel
-            </Button>
+            <div className="flex gap-3">
+              <Button onClick={handleCreateVisit} className="rounded-full" disabled={!selectedPatient}>
+                Start visit
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowNewForm(false);
+                  setSelectedPatient("");
+                  setSelectedPatientName("");
+                  setSearchQuery("");
+                }}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
         </Panel>
       )}
