@@ -13,8 +13,7 @@ export type ISODateTime = string; // "2026-05-14T09:30:00.000Z"
 
 export type RoleId =
   | "administrator"
-  | "receptionist"
-  | "optometrist"
+  | "sales_associate"
   | "cashier"
   | "store_officer";
 
@@ -28,14 +27,12 @@ export interface Role {
 
 export type ModuleKey =
   | "dashboard"
-  | "patients"
-  | "appointments"
-  | "clinical"
-  | "prescriptions"
+  | "customers"
   | "invoices"
   | "payments"
-  | "insurance"
   | "inventory"
+  | "purchases"
+  | "service"
   | "suppliers"
   | "reports"
   | "administration"
@@ -53,202 +50,19 @@ export interface User {
   createdAt: ISODateTime;
 }
 
-/* --------------------------------------------------------------- patients */
+/* -------------------------------------------------------------- customers */
 
-export type Gender = "male" | "female" | "other";
-
-export interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
-}
-
-export interface NextOfKin {
-  name: string;
-  relationship: string;
-  phone: string;
-  address?: string;
-}
-
-export interface Patient {
+export interface Customer {
   id: string;
-  patientNumber: string;
-  firstName: string;
-  middleName?: string;
-  lastName: string;
-  dateOfBirth: ISODate;
-  gender: Gender;
-  nationalId?: string;
+  customerNumber: string;
+  name: string;
+  companyName?: string;
   phone: string;
-  altPhone?: string;
   email?: string;
-  county: string;
-  town: string;
   address?: string;
-  emergencyContact: EmergencyContact;
-  nextOfKin?: NextOfKin;
-  occupation?: string;
-  referralSource?: string;
-  insuranceProviderId?: string;
-  insuranceMemberNumber?: string;
   notes?: string;
   status: "active" | "archived";
   registeredAt: ISODateTime;
-  lastVisitAt: ISODateTime | null;
-}
-
-/* ----------------------------------------------------------- appointments */
-
-export type AppointmentStatus =
-  | "scheduled"
-  | "confirmed"
-  | "checked_in"
-  | "waiting"
-  | "in_consultation"
-  | "completed"
-  | "cancelled"
-  | "no_show";
-
-export type AppointmentType =
-  | "new_consultation"
-  | "review"
-  | "eye_test"
-  | "contact_lens_fitting"
-  | "spectacle_collection"
-  | "follow_up";
-
-export interface Appointment {
-  id: string;
-  patientId: string;
-  date: ISODate;
-  time: string; // "09:30"
-  clinicianId: string;
-  type: AppointmentType;
-  reason: string;
-  notes?: string;
-  status: AppointmentStatus;
-  createdAt: ISODateTime;
-}
-
-/* --------------------------------------------------------------- clinical */
-
-export interface EyePair<T> {
-  od: T; // right eye
-  os: T; // left eye
-}
-
-export interface RefractionValues {
-  sphere: string;
-  cylinder: string;
-  axis: string;
-  add: string;
-  prism: string;
-  va: string;
-}
-
-export interface RefractionSet {
-  unaided: EyePair<RefractionValues>;
-  objective: EyePair<RefractionValues>;
-  subjective: EyePair<RefractionValues>;
-  final: EyePair<RefractionValues>;
-}
-
-export interface VisualAcuity {
-  unaidedOd: string;
-  unaidedOs: string;
-  unaidedNear: string;
-  aidedOd: string;
-  aidedOs: string;
-  pinholeOd: string;
-  pinholeOs: string;
-}
-
-export interface EyeExamination {
-  visualAcuity: VisualAcuity;
-  refraction: RefractionSet;
-  pd: string;
-  nearPd: string;
-  binocularVision: string;
-  colourVision: string;
-  ocularMotility: string;
-  pupils: string;
-  anteriorSegment: string;
-  posteriorSegment: string;
-  iopOd: string;
-  iopOs: string;
-  keratometry?: string;
-  contactLensNotes?: string;
-}
-
-export interface Diagnosis {
-  code?: string;
-  description: string;
-  eye: "od" | "os" | "ou";
-}
-
-export interface ClinicalVisit {
-  id: string;
-  visitNumber: string;
-  patientId: string;
-  clinicianId: string;
-  date: ISODate;
-  status: "draft" | "completed";
-  chiefComplaint: {
-    reason: string;
-    symptoms: string;
-    duration: string;
-    previousEyeProblems: string;
-    patientConcerns: string;
-  };
-  medicalHistory: {
-    general: string;
-    medications: string;
-    allergies: string;
-    conditions: string;
-    surgeries: string;
-    familyHistory: string;
-  };
-  ocularHistory: {
-    conditions: string;
-    surgery: string;
-    correction: string;
-    lastExam: string;
-    other: string;
-  };
-  examination: EyeExamination;
-  diagnoses: Diagnosis[];
-  findings: string;
-  assessment: string;
-  managementPlan: string;
-  followUpDate: ISODate | null;
-  clinicalNotes: string;
-  createdAt: ISODateTime;
-}
-
-/* ---------------------------------------------------------- prescriptions */
-
-export interface Prescription {
-  id: string;
-  prescriptionNumber: string;
-  patientId: string;
-  visitId?: string;
-  clinicianId: string;
-  date: ISODate;
-  eyes: EyePair<RefractionValues>;
-  pd: string;
-  lensType: string;
-  lensMaterial: string;
-  lensCoating: string;
-  frameInfo?: string;
-  contactLens?: {
-    brand: string;
-    baseCurve: string;
-    diameter: string;
-    power: string;
-    replacement: string;
-  };
-  notes?: string;
-  createdAt: ISODateTime;
 }
 
 /* --------------------------------------------------------------- billing */
@@ -265,21 +79,66 @@ export interface InvoiceItem {
   id: string;
   description: string;
   productId?: string;
+  supplierId?: string;
   serviceCode?: string;
   quantity: number;
   unitPrice: number;
   discount: number;
+  serialNumbers?: string[];
+}
+
+export interface PurchaseItem {
+  productId: string;
+  quantity: number;
+  unitCost: number;
+  sellingPrice?: number;
+  serialNumbers?: string[];
+}
+
+export interface PurchaseOrder {
+  id: string;
+  purchaseNumber: string;
+  supplierId: string;
+  orderDate: ISODate;
+  receivedAt?: ISODateTime;
+  status: "ordered" | "delivered" | "returned" | "cancelled";
+  items: PurchaseItem[];
+  notes?: string;
+  createdBy: string;
+  createdAt: ISODateTime;
+}
+
+export type ServiceStatus =
+  | "received"
+  | "diagnosing"
+  | "waiting_parts"
+  | "ready"
+  | "returned"
+  | "cancelled";
+
+export interface ServiceTicket {
+  id: string;
+  ticketNumber: string;
+  customerId: string;
+  productId?: string;
+  serialNumber: string;
+  issue: string;
+  warrantyUntil?: ISODate;
+  estimatedCost: number;
+  status: ServiceStatus;
+  notes?: string;
+  receivedAt: ISODateTime;
+  createdBy: string;
 }
 
 export interface Invoice {
   id: string;
   invoiceNumber: string;
-  patientId: string;
+  customerId: string;
   date: ISODate;
   items: InvoiceItem[];
   taxRate: number;
   status: InvoiceStatus;
-  insuranceClaimId?: string;
   notes?: string;
   createdBy: string;
   createdAt: ISODateTime;
@@ -290,14 +149,13 @@ export type PaymentMethod =
   | "mpesa"
   | "card"
   | "bank_transfer"
-  | "insurance"
   | "other";
 
 export interface Payment {
   id: string;
   receiptNumber: string;
   invoiceId: string;
-  patientId: string;
+  customerId: string;
   amount: number;
   method: PaymentMethod;
   /** M-Pesa code, card auth, bank slip etc. Populated by the integration later. */
@@ -311,63 +169,22 @@ export interface Payment {
 export interface Receipt {
   payment: Payment;
   invoice: Invoice;
-  patient: Patient;
-}
-
-/* ------------------------------------------------------------- insurance */
-
-export interface InsuranceProvider {
-  id: string;
-  name: string;
-  code: string;
-  contactPerson: string;
-  phone: string;
-  email: string;
-  coverageNotes: string;
-  status: "active" | "inactive";
-}
-
-export type ClaimStatus =
-  | "draft"
-  | "submitted"
-  | "approved"
-  | "partially_approved"
-  | "rejected"
-  | "paid";
-
-export interface InsuranceClaim {
-  id: string;
-  claimNumber: string;
-  providerId: string;
-  patientId: string;
-  invoiceId: string;
-  memberNumber: string;
-  policyNumber: string;
-  claimedAmount: number;
-  approvedAmount: number;
-  patientCopay: number;
-  status: ClaimStatus;
-  submittedAt: ISODate | null;
-  notes?: string;
 }
 
 /* ------------------------------------------------------------- inventory */
 
-export type ProductCategory =
-  | "frames"
-  | "lenses"
-  | "contact_lenses"
-  | "accessories"
-  | "eye_care"
-  | "other";
+export type ProductCategory = string;
 
 export interface Product {
   id: string;
   sku: string;
   name: string;
+  hasSerialNumber?: boolean;
   category: ProductCategory;
   brand: string;
-  supplierId: string;
+  parentProductId?: string;
+  variantLabel?: string;
+  supplierId?: string;
   costPrice: number;
   sellingPrice: number;
   quantity: number;
@@ -411,7 +228,7 @@ export interface AuditLog {
 }
 
 export interface PracticeSettings {
-  practiceName: string;
+  storeName: string;
   tagline: string;
   address: string;
   county: string;
@@ -423,7 +240,8 @@ export interface PracticeSettings {
   taxLabel: string;
   invoicePrefix: string;
   receiptPrefix: string;
-  prescriptionPrefix: string;
   registrationNumber: string;
   kraPin: string;
+  productCategories: string[];
+  productBrands: string[];
 }

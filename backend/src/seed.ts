@@ -17,21 +17,16 @@ function insertAll(name: ResourceName, rows: readonly unknown[]): void {
 }
 
 export function seedIfEmpty(): void {
-  if (count("patients") === 0 && count("roles") === 0) {
+  if (count("customers") === 0 && count("roles") === 0) {
     transaction(() => {
       insertAll("roles", data.roles);
       for (const user of data.users) createUser(user as unknown as Entity, ADMIN_PASSWORD);
-      insertAll("providers", data.insuranceProviders);
-      insertAll("patients", data.patients);
-      insertAll("appointments", data.appointments);
-      insertAll("visits", data.visits);
-      insertAll("prescriptions", data.prescriptions);
+      insertAll("customers", data.customers);
       insertAll("suppliers", data.suppliers);
       insertAll("products", data.products);
       insertAll("stock", data.inventoryTransactions);
       insertAll("invoices", data.invoices);
       insertAll("payments", data.payments);
-      insertAll("claims", data.claims);
       insertAll("audit", data.auditLogs);
       saveSettings(data.practiceSettings as unknown as Entity);
     });
@@ -56,7 +51,7 @@ function ensureAdmin(): void {
     {
       id: "u1",
       fullName: "Admin",
-      email: "admin@amanieye.co.ke",
+      email: "admin@laptopstore.local",
       username: ADMIN_USERNAME,
       phone: "0722 145 880",
       role: "administrator",

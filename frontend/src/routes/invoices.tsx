@@ -13,9 +13,12 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { meta } from "@/lib/meta";
+import { ApiError } from "@/services/api";
+import type { InvoiceStatus, PaymentMethod } from "@/types";
 import {
   useDB,
-  patientName,
+  customerName,
+  createSale,
   createRecord,
   updateRecord,
   deleteRecord,
@@ -23,6 +26,7 @@ import {
   todayISO,
   nowISO,
   invoiceTotals,
+  supplierProductStock,
   money,
   uid,
 } from "@/services/store";
@@ -31,7 +35,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, Receipt, Printer, Send } from "lucide-react";
 
 export const Route = createFileRoute("/invoices")({
-  head: () => meta("Invoices", "Invoices and billing — Amani Eye practice manager."),
+  head: () => meta("Sales", "Laptop sales, invoices, and customer balances."),
   component: InvoiceRouteView,
 });
 
@@ -53,18 +57,19 @@ function Invoices() {
   const [showNewDialog, setShowNewDialog] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
-  const [patientSearch, setPatientSearch] = useState("");
-  const [selectedInvoicePatient, setSelectedInvoicePatient] = useState("");
-  const [selectedInvoicePatientName, setSelectedInvoicePatientName] = useState("");
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [selectedInvoiceCustomer, setSelectedInvoiceCustomer] = useState("");
+  const [selectedInvoiceCustomerName, setSelectedInvoiceCustomerName] = useState("");
   const [includeTax, setIncludeTax] = useState(true);
   const [taxRate, setTaxRate] = useState(db.settings.taxRate);
   const [saving, setSaving] = useState(false);
 
   const invoices = [...db.invoices].sort((a, b) => b.date.localeCompare(a.date));
   const filteredInvoices = invoices.filter((invoice) => {
-    const patient = db.patients.find((item) => item.id === invoice.patientId);
+    const customer = db.customers.find((item) => item.id === invoice.customerId);
+    const serialNumbers = invoice.items.flatMap((item) => item.serialNumbers ?? []).join(" ");
     const matchesSearch =
-      `${invoice.invoiceNumber} ${patientName(patient)} ${patient?.patientNumber ?? ""}`
+      `${invoice.invoiceNumber} ${customerName(customer)} ${customer?.customerNumber ?? ""} ${serialNumbers}`
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
     return matchesSearch && (statusFilter === "all" || invoice.status === statusFilter);
@@ -78,24 +83,27 @@ function Invoices() {
     .reduce((sum, payment) => sum + payment.amount, 0);
 
   const [newInvoice, setNewInvoice] = useState({
-    patientId: "",
+    customerId: "",
     items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }],
     notes: "",
   });
 
   const supplierOptions = db.suppliers;
+  const supplierBalances = supplierProductStock(db);
+  const availableQuantity = (supplierId: string, productId: string) =>
+    supplierBalances.find((balance) => balance.supplierId === supplierId && balance.productId === productId)?.quantity ?? 0;
 
-  const filteredPatients = db.patients
+  const filteredCustomers = db.customers
     .filter(
-      (p) =>
-        p.status === "active" &&
-        `${patientName(p)} ${p.patientNumber} ${p.phone}`
+      (customer) =>
+        customer.status === "active" &&
+        `${customerName(customer)} ${customer.customerNumber} ${customer.phone}`
           .toLowerCase()
-          .includes(patientSearch.toLowerCase()),
+          .includes(customerSearch.toLowerCase()),
     )
     .slice(0, 8);
 
-  const showPatientDropdown = patientSearch.length > 0 && !selectedInvoicePatient && filteredPatients.length > 0;
+  const showCustomerDropdown = customerSearch.length > 0 && !selectedInvoiceCustomer && filteredCustomers.length > 0;
 
   const addInvoiceItem = () => {
     setNewInvoice({
@@ -109,8 +117,10 @@ function Invoices() {
 
   const updateInvoiceItemSupplier = (index: number, supplierId: string) => {
     const updated = [...newInvoice.items];
+    const item = updated[index];
+    if (!item) return;
     updated[index] = {
-      ...updated[index],
+      ...item,
       supplierId,
       productId: "",
       description: "",
@@ -122,11 +132,13 @@ function Invoices() {
   const updateInvoiceItemProduct = (index: number, productId: string) => {
     const selectedProduct = db.products.find((product) => product.id === productId);
     const updated = [...newInvoice.items];
+    const item = updated[index];
+    if (!item) return;
     updated[index] = {
-      ...updated[index],
+      ...item,
       productId,
-      description: selectedProduct?.name ?? updated[index].description,
-      unitPrice: selectedProduct?.sellingPrice ?? updated[index].unitPrice,
+      description: selectedProduct?.name ?? item.description,
+      unitPrice: selectedProduct?.sellingPrice ?? item.unitPrice,
     };
     setNewInvoice({ ...newInvoice, items: updated });
   };
@@ -138,17 +150,34 @@ function Invoices() {
     });
   };
 
-  const updateInvoiceItem = (index: number, field: string, value: string | number) => {
+  const updateInvoiceItem = <K extends "description" | "quantity" | "unitPrice" | "discount">(
+    index: number,
+    field: K,
+    value: (typeof newInvoice.items)[number][K],
+  ) => {
     const updated = [...newInvoice.items];
-    updated[index] = { ...updated[index], [field]: value };
+    const item = updated[index];
+    if (!item) return;
+    updated[index] = { ...item, [field]: value };
     setNewInvoice({ ...newInvoice, items: updated });
   };
 
   const handleCreateInvoice = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const exceedsSupplierStock = newInvoice.items.some((item) =>
+      Boolean(item.productId) && (
+        !item.supplierId ||
+        !Number.isInteger(item.quantity) ||
+        item.quantity > availableQuantity(item.supplierId, item.productId!)
+      ),
+    );
+    if (exceedsSupplierStock) {
+      toast.error("Choose a supplier with enough available stock for each product");
+      return;
+    }
     if (
       !user ||
-      !newInvoice.patientId ||
+      !newInvoice.customerId ||
       newInvoice.items.some(
         (item) =>
           !(item.productId || item.description.trim()) ||
@@ -168,9 +197,9 @@ function Invoices() {
         db.settings.invoicePrefix,
         db.invoices.map((i) => i.invoiceNumber),
       );
-      const invoice = await createRecord("invoices", {
+      const invoice = await createSale({
         invoiceNumber,
-        patientId: newInvoice.patientId,
+        customerId: newInvoice.customerId,
         date: todayISO(),
         items: newInvoice.items,
         taxRate: includeTax ? taxRate : 0,
@@ -183,16 +212,16 @@ function Invoices() {
       toast.success("Invoice created successfully");
       setShowNewDialog(false);
       setNewInvoice({
-        patientId: "",
+        customerId: "",
         items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }],
         notes: "",
       });
       setIncludeTax(true);
       setTaxRate(db.settings.taxRate);
-      setPatientSearch("");
+      setCustomerSearch("");
       navigate({ to: "/invoices/$id", params: { id: invoice.id } });
     } catch (error) {
-      toast.error("Failed to create invoice");
+      toast.error(error instanceof ApiError ? error.message : "Failed to create invoice");
       console.error(error);
     } finally {
       setSaving(false);
@@ -216,18 +245,18 @@ function Invoices() {
         title="Invoices"
         subtitle={`${invoices.length} total invoices`}
         actions={
-          db.patients.some((patient) => patient.status === "active") ? (
+          db.customers.some((customer) => customer.status === "active") ? (
             <Dialog
               open={showNewDialog}
               onOpenChange={(open) => {
                 setShowNewDialog(open);
                 if (!open) {
-                  setPatientSearch("");
-                  setSelectedInvoicePatient("");
-                  setSelectedInvoicePatientName("");
+                  setCustomerSearch("");
+                  setSelectedInvoiceCustomer("");
+                  setSelectedInvoiceCustomerName("");
                   setIncludeTax(true);
                   setTaxRate(db.settings.taxRate);
-                  setNewInvoice({ patientId: "", items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }], notes: "" });
+                  setNewInvoice({ customerId: "", items: [{ id: uid("ii"), description: "", productId: "", supplierId: "", quantity: 1, unitPrice: 0, discount: 0 }], notes: "" });
                 }
               }}
             >
@@ -242,17 +271,17 @@ function Invoices() {
                 </DialogHeader>
                 <form onSubmit={(event) => void handleCreateInvoice(event)} className="space-y-4">
                   <div className="relative">
-                    <label className="text-sm font-medium">Patient *</label>
-                    {selectedInvoicePatient ? (
+                    <label className="text-sm font-medium">Customer *</label>
+                    {selectedInvoiceCustomer ? (
                       <div className="mt-1 flex items-center gap-2 rounded-lg border bg-muted/50 px-3 py-2">
-                        <span className="flex-1 text-sm font-medium">{selectedInvoicePatientName}</span>
+                        <span className="flex-1 text-sm font-medium">{selectedInvoiceCustomerName}</span>
                         <button
                           type="button"
                           onClick={() => {
-                            setSelectedInvoicePatient("");
-                            setSelectedInvoicePatientName("");
-                            setNewInvoice({ ...newInvoice, patientId: "" });
-                            setPatientSearch("");
+                            setSelectedInvoiceCustomer("");
+                            setSelectedInvoiceCustomerName("");
+                            setNewInvoice({ ...newInvoice, customerId: "" });
+                            setCustomerSearch("");
                           }}
                           className="text-muted-foreground hover:text-destructive text-xs underline"
                         >
@@ -262,31 +291,31 @@ function Invoices() {
                     ) : (
                       <>
                         <Input
-                          placeholder="Type name, ID or phone..."
-                          value={patientSearch}
+                          placeholder="Search customer name, number or phone..."
+                          value={customerSearch}
                           onChange={(e) => {
-                            setPatientSearch(e.target.value);
-                            setNewInvoice({ ...newInvoice, patientId: "" });
+                            setCustomerSearch(e.target.value);
+                            setNewInvoice({ ...newInvoice, customerId: "" });
                           }}
                           className="mt-1"
                           autoComplete="off"
                         />
-                        {showPatientDropdown && (
+                        {showCustomerDropdown && (
                           <div className="absolute left-0 right-0 top-[4.5rem] z-50 overflow-hidden rounded-xl border bg-popover shadow-lg max-h-56 overflow-y-auto">
-                            {filteredPatients.map((p) => (
+                            {filteredCustomers.map((customer) => (
                               <button
-                                key={p.id}
+                                key={customer.id}
                                 type="button"
                                 onClick={() => {
-                                  setSelectedInvoicePatient(p.id);
-                                  setSelectedInvoicePatientName(patientName(p));
-                                  setNewInvoice({ ...newInvoice, patientId: p.id });
-                                  setPatientSearch("");
+                                  setSelectedInvoiceCustomer(customer.id);
+                                  setSelectedInvoiceCustomerName(customerName(customer));
+                                  setNewInvoice({ ...newInvoice, customerId: customer.id });
+                                  setCustomerSearch("");
                                 }}
                                 className="w-full text-left px-4 py-2.5 text-sm hover:bg-muted border-b last:border-0"
                               >
-                                <span className="font-medium">{patientName(p)}</span>
-                                <span className="ml-2 text-xs text-muted-foreground">{p.patientNumber} · {p.phone}</span>
+                                <span className="font-medium">{customerName(customer)}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">{customer.customerNumber} · {customer.phone}</span>
                               </button>
                             ))}
                           </div>
@@ -334,9 +363,12 @@ function Invoices() {
                         const availableProducts = item.supplierId
                           ? db.products.filter(
                               (product) =>
-                                product.status === "active" && product.supplierId === item.supplierId,
+                                product.status === "active" && availableQuantity(item.supplierId!, product.id) > 0,
                             )
                           : [];
+                        const availableQuantityForItem = item.supplierId && item.productId
+                          ? availableQuantity(item.supplierId, item.productId)
+                          : 0;
 
                         return (
                         <div
@@ -366,10 +398,10 @@ function Invoices() {
                                 className={selectCls}
                                 disabled={!item.supplierId}
                               >
-                                <option value="">{item.supplierId ? "Select product" : "Select supplier first"}</option>
+                                <option value="">{item.supplierId ? availableProducts.length > 0 ? "Select product" : "No stock available from supplier" : "Select supplier first"}</option>
                                 {availableProducts.map((product) => (
                                   <option key={product.id} value={product.id}>
-                                    {product.name} ({product.brand})
+                                    {product.name} ({product.brand}) · {availableQuantity(item.supplierId!, product.id)} available
                                   </option>
                                 ))}
                               </select>
@@ -401,7 +433,9 @@ function Invoices() {
                                     )
                                   }
                                   min="1"
+                                  max={availableQuantityForItem || undefined}
                                 />
+                                {item.productId && <span className="text-xs text-muted-foreground">{availableQuantityForItem} available from this supplier</span>}
                               </Field>
                             </div>
                             <div className="w-28">
@@ -512,8 +546,8 @@ function Invoices() {
             </Dialog>
           ) : (
             <Button asChild className="rounded-full">
-              <Link to="/patients/new">
-                <Plus className="mr-2 size-4" /> Register patient
+              <Link to="/customers/new">
+                <Plus className="mr-2 size-4" /> Add customer
               </Link>
             </Button>
           )
@@ -547,7 +581,7 @@ function Invoices() {
           <Input
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search invoice or patient..."
+            placeholder="Search invoice, customer, or serial number..."
             aria-label="Search invoices"
           />
           <select
@@ -573,7 +607,7 @@ function Invoices() {
               <thead>
                 <tr>
                   <th>Invoice #</th>
-                  <th>Patient</th>
+                  <th>Customer</th>
                   <th>Date</th>
                   <th>Status</th>
                   <th>Total</th>
@@ -584,18 +618,18 @@ function Invoices() {
               </thead>
               <tbody>
                 {filteredInvoices.map((inv) => {
-                  const patient = db.patients.find((p) => p.id === inv.patientId);
+                  const customer = db.customers.find((entry) => entry.id === inv.customerId);
                   const totals = invoiceTotals(inv, db);
                   return (
                     <tr key={inv.id}>
                       <td className="font-mono">{inv.invoiceNumber}</td>
                       <td>
                         <Link
-                          to="/patients/$id"
-                          params={{ id: inv.patientId }}
+                          to="/customers/$id"
+                          params={{ id: inv.customerId }}
                           className="font-semibold hover:underline"
                         >
-                          {patientName(patient)}
+                          {customerName(customer)}
                         </Link>
                       </td>
                       <td>{new Date(inv.date).toLocaleDateString()}</td>
@@ -648,7 +682,7 @@ export function InvoiceDetail({ id }: { id: string }) {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<
-    "cash" | "mpesa" | "card" | "bank_transfer" | "insurance" | "other"
+    "cash" | "mpesa" | "card" | "bank_transfer" | "other"
   >("cash");
   const [paymentReference, setPaymentReference] = useState("");
 
@@ -667,7 +701,7 @@ export function InvoiceDetail({ id }: { id: string }) {
     );
   }
 
-  const patient = db.patients.find((p) => p.id === invoice.patientId);
+  const customer = db.customers.find((entry) => entry.id === invoice.customerId);
   const totals = invoiceTotals(invoice, db);
   const payments = db.payments.filter((p) => p.invoiceId === id && p.status === "confirmed");
 
@@ -701,10 +735,10 @@ export function InvoiceDetail({ id }: { id: string }) {
       await createRecord("payments", {
         receiptNumber,
         invoiceId: id,
-        patientId: invoice.patientId,
+        customerId: invoice.customerId,
         amount,
         method: paymentMethod,
-        reference: paymentReference || undefined,
+        ...(paymentReference ? { reference: paymentReference } : {}),
         date: nowISO(),
         receivedBy: user.id,
         status: "confirmed",
@@ -729,7 +763,7 @@ export function InvoiceDetail({ id }: { id: string }) {
     }
   };
 
-  const handleUpdateStatus = async (newStatus: string) => {
+  const handleUpdateStatus = async (newStatus: InvoiceStatus) => {
     try {
       await updateRecord("invoices", id, { status: newStatus });
       toast.success("Invoice status updated");
@@ -743,7 +777,7 @@ export function InvoiceDetail({ id }: { id: string }) {
     <>
       <PageHeader
         title={`Invoice ${invoice.invoiceNumber}`}
-        subtitle={`${patientName(patient)} • ${new Date(invoice.date).toLocaleDateString()}`}
+        subtitle={`${customerName(customer)} • ${new Date(invoice.date).toLocaleDateString()}`}
         actions={
           <>
             <Button variant="outline" onClick={() => navigate({ to: "/invoices" })}>
@@ -769,13 +803,13 @@ export function InvoiceDetail({ id }: { id: string }) {
         <Panel title="Invoice details">
           <div className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Patient:</span>
+              <span className="text-muted-foreground">Customer:</span>
               <Link
-                to="/patients/$id"
-                params={{ id: invoice.patientId }}
+                to="/customers/$id"
+                params={{ id: invoice.customerId }}
                 className="font-semibold hover:underline"
               >
-                {patientName(patient)}
+                {customerName(customer)}
               </Link>
             </div>
             <div className="flex justify-between">
@@ -843,7 +877,14 @@ export function InvoiceDetail({ id }: { id: string }) {
           <tbody>
             {invoice.items.map((item, index) => (
               <tr key={index}>
-                <td>{item.description}</td>
+                <td>
+                  <span>{item.description}</span>
+                  {item.serialNumbers && item.serialNumbers.length > 0 && (
+                    <span className="mt-1 block break-all font-mono text-xs text-muted-foreground">
+                      Serial number(s): {item.serialNumbers.join(", ")}
+                    </span>
+                  )}
+                </td>
                 <td>{item.quantity}</td>
                 <td>{money(item.unitPrice, db.settings.currency)}</td>
                 <td>{money(item.discount, db.settings.currency)}</td>
@@ -922,14 +963,13 @@ export function InvoiceDetail({ id }: { id: string }) {
               <label className="text-sm font-medium">Payment method *</label>
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value as any)}
+                onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
                 className={selectCls + " mt-1 w-full"}
               >
                 <option value="cash">Cash</option>
                 <option value="mpesa">M-Pesa</option>
                 <option value="card">Card</option>
                 <option value="bank_transfer">Bank transfer</option>
-                <option value="insurance">Insurance</option>
                 <option value="other">Other</option>
               </select>
             </div>

@@ -4,7 +4,7 @@ import { meta } from "@/lib/meta";
 import { InvoiceDetail } from "./invoices";
 
 export const Route = createFileRoute("/invoices/$id")({
-  head: () => meta("Invoice details", "Invoice details — Amani Eye practice manager."),
+  head: () => meta("Sale details", "Laptop sale details and payment history."),
   component: InvoiceDetailsPage,
 });
 

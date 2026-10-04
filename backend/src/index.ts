@@ -1,5 +1,5 @@
 /**
- * HTTP API for the optometry practice management system.
+ * HTTP API for the laptop store management system.
  * Node's built-in http server + node:sqlite — no runtime dependencies.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -7,15 +7,22 @@ import { monthlySeries, weeklySeries } from "./analytics.ts";
 import { createUser, setPassword, signIn, signOut, userForToken } from "./auth.ts";
 import {
   create,
+  createPurchase,
+  deleteSale,
+  deletePurchase,
   find,
   isResourceName,
   list,
   logAudit,
   remove,
+  purchaseSerialNumberError,
+  saleSerialNumberError,
+  createSale,
   resources,
   saveSettings,
   settings,
   update,
+  updatePurchase,
   type Entity,
   type ResourceName,
 } from "./resources.ts";
@@ -155,11 +162,56 @@ async function route(req: IncomingMessage, res: ServerResponse): Promise<void> {
 
   const user = requireUser(req);
 
+  if (name === "invoices" && id === "checkout" && !action && method === "POST") {
+    const body = await readBody(req);
+    if (String(body.createdBy ?? "") !== String(user.id)) throw new HttpError(403, "Sales must be recorded by the signed-in user.");
+    const serialNumberError = saleSerialNumberError(body);
+    if (serialNumberError) throw new HttpError(409, serialNumberError);
+    const invoice = createSale(body);
+    if (!invoice) throw new HttpError(409, "A customer and valid in-stock products are required to complete this sale.");
+    logAudit(String(user.id), "Created sale", "invoices", String(invoice.invoiceNumber), "Invoice created and stock deducted.");
+    return send(res, 201, invoice);
+  }
+
+  if (name === "invoices" && id && !action && method === "DELETE") {
+    if (!find("invoices", id)) throw new HttpError(404, "Invoice not found.");
+    if (!deleteSale(id)) throw new HttpError(409, "Invoice cannot be deleted because its stock could not be restored.");
+    logAudit(String(user.id), "Deleted sale", "invoices", id, "Invoice deleted and supplier stock restored.");
+    return send(res, 200, { ok: true });
+  }
+
+  if (name === "purchases" && id && !action && (method === "PATCH" || method === "PUT")) {
+    const purchase = find("purchases", id);
+    if (!purchase) throw new HttpError(404, "Purchase order not found.");
+    const updated = updatePurchase(id, await readBody(req), String(user.id));
+    if (!updated) throw new HttpError(409, "Purchase could not be updated; the purchase data may be invalid or stock would become negative.");
+    logAudit(String(user.id), "Updated purchase order", "purchases", String(updated.purchaseNumber), "Purchase order updated.");
+    return send(res, 200, updated);
+  }
+
+  if (name === "purchases" && id && !action && method === "DELETE") {
+    const purchase = find("purchases", id);
+    if (!purchase) throw new HttpError(404, "Purchase order not found.");
+    const isAdmin = user.role === "administrator";
+    if (!deletePurchase(id, isAdmin)) throw new HttpError(409, "Purchase order cannot be deleted because reversing it would make inventory negative.");
+    logAudit(String(user.id), "Deleted purchase order", "purchases", String(purchase.purchaseNumber), isAdmin ? "Purchase order force deleted by administrator." : "Purchase order deleted and received stock reversed.");
+    return send(res, 200, { ok: true });
+  }
+
   if (!id) {
     if (method === "GET") return send(res, 200, list(name));
     if (method === "POST") {
       const body = await readBody(req);
-      const record = create(name, body);
+      let record: Entity;
+      if (name === "purchases") {
+        const serialNumberError = purchaseSerialNumberError(body.items);
+        if (serialNumberError) throw new HttpError(400, serialNumberError);
+        const purchase = createPurchase(body, String(user.id));
+        if (!purchase) throw new HttpError(400, "Choose a supplier and valid active products with positive quantities.");
+        record = purchase;
+      } else {
+        record = create(name, body);
+      }
       logAudit(String(user.id), "Created record", auditModule(name), String(record.id), `Created ${singular(name)}.`);
       return send(res, 201, record);
     }
@@ -189,9 +241,7 @@ const auditModules: Partial<Record<ResourceName, string>> = {
   users: "administration",
   roles: "administration",
   audit: "administration",
-  providers: "insurance",
   stock: "inventory",
-  claims: "insurance",
 };
 const auditModule = (name: ResourceName): string => auditModules[name] ?? name;
 const singular = (name: ResourceName): string => name.replace(/ies$/, "y").replace(/s$/, "");

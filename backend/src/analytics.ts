@@ -3,9 +3,8 @@ import { all } from "./db.ts";
 interface Point {
   label: string;
   revenue: number;
-  visits: number;
-  newPatients: number;
-  returning: number;
+  sales: number;
+  newCustomers: number;
 }
 
 const revenueBetween = (from: string, to: string): number =>
@@ -25,14 +24,13 @@ const countBetween = (table: string, column: string, from: string, to: string): 
 function point(label: string, from: Date, to: Date): Point {
   const fromISO = from.toISOString();
   const toISO = to.toISOString();
-  const visits = countBetween("visits", "date", fromISO.slice(0, 10), toISO.slice(0, 10));
-  const newPatients = countBetween("patients", "registeredAt", fromISO, toISO);
+  const sales = countBetween("invoices", "date", fromISO.slice(0, 10), toISO.slice(0, 10));
+  const newCustomers = countBetween("customers", "registeredAt", fromISO, toISO);
   return {
     label,
     revenue: revenueBetween(fromISO, toISO),
-    visits,
-    newPatients,
-    returning: Math.max(0, visits - newPatients),
+    sales,
+    newCustomers,
   };
 }
 

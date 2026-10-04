@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { jsPDF } from "jspdf";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Panel, Stat, StatusBadge, Field, selectCls, tableCls } from "@/components/kit";
+import { Panel, StatusBadge, Field, selectCls, tableCls } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -20,11 +20,19 @@ import {
   nowISO,
 } from "@/services/store";
 import { useSession } from "@/lib/auth";
-import type { PaymentMethod } from "@/types";
-import { Download, Printer, Receipt } from "lucide-react";
+import type { Customer, Invoice, Payment, PaymentMethod, User } from "@/types";
+import {
+  ArrowDownLeft,
+  CreditCard,
+  Download,
+  Printer,
+  Receipt,
+  Search,
+  Wallet,
+} from "lucide-react";
 
 export const Route = createFileRoute("/payments")({
-  head: () => meta("Payments", "Payments — Amani Eye practice manager."),
+  head: () => meta("Payments", "Customer payments and receipts."),
   component: () => (
     <AppShell module="payments">
       <Payments />
@@ -32,16 +40,47 @@ export const Route = createFileRoute("/payments")({
   ),
 });
 
-const methods: PaymentMethod[] = ["cash", "mpesa", "card", "bank_transfer", "insurance", "other"];
+const methods: PaymentMethod[] = ["cash", "mpesa", "card", "bank_transfer", "other"];
 
 const formatReceiptLine = (label: string, value: string) => `${label}: ${value}`;
+const receiptHtmlEscapes: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+};
+const escapeReceiptHtml = (value: unknown) =>
+  String(value).replace(/[&<>"']/g, (character) => receiptHtmlEscapes[character] ?? character);
 
-const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiver: any, currency: string) => {
+const createPrintableReceipt = (
+  payment: Payment,
+  customer: Customer | undefined,
+  invoice: Invoice | undefined,
+  receiver: User | undefined,
+  currency: string,
+  storeName: string,
+) => {
   const printWindow = window.open("", "_blank", "width=900,height=980");
   if (!printWindow) {
-    toast.error("Your browser blocked the payment receipt window. Please allow pop-ups and try again.");
+    toast.error(
+      "Your browser blocked the payment receipt window. Please allow pop-ups and try again.",
+    );
     return false;
   }
+
+  const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  const invoiceItemRows = invoiceItems
+    .map(
+      (item) => `
+    <tr>
+      <td>${escapeReceiptHtml(item.description || "Product")}</td>
+      <td>${escapeReceiptHtml(item.serialNumbers?.join(", ") || "—")}</td>
+      <td>${escapeReceiptHtml(item.quantity ?? 0)}</td>
+    </tr>
+  `,
+    )
+    .join("");
 
   const receiptHtml = `
     <!doctype html>
@@ -119,7 +158,7 @@ const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiv
             font-size: 16px;
             font-weight: 700;
           }
-          .patient-box {
+          .customer-box {
             border: 1px solid var(--line);
             border-radius: 14px;
             padding: 16px 18px;
@@ -195,7 +234,7 @@ const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiv
       <body>
         <div class="receipt">
           <div class="header">
-            <h1>Amani Eye Practice</h1>
+            <h1>${storeName}</h1>
             <p>Payment receipt · Proof of payment</p>
           </div>
 
@@ -219,10 +258,10 @@ const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiv
               </div>
             </div>
 
-            <div class="patient-box">
-              <div class="label">Patient</div>
-              <div class="value">${patient ? `${patient.firstName} ${patient.lastName}` : "Unknown patient"}</div>
-              ${patient?.phone ? `<div style="margin-top:8px;color:#475569;">${patient.phone}</div>` : ""}
+            <div class="customer-box">
+              <div class="label">Customer</div>
+              <div class="value">${customer?.companyName || customer?.name || "Walk-in customer"}</div>
+              ${customer?.phone ? `<div style="margin-top:8px;color:#475569;">${customer.phone}</div>` : ""}
             </div>
 
             <table>
@@ -243,6 +282,19 @@ const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiv
                     minimumFractionDigits: 2,
                   }).format(payment.amount)}</td>
                 </tr>
+              </tbody>
+            </table>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Product</th>
+                  <th>Serial number(s)</th>
+                  <th>Qty</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${invoiceItemRows || `<tr><td colspan="3">No invoice items</td></tr>`}
               </tbody>
             </table>
 
@@ -281,7 +333,14 @@ const createPrintableReceipt = (payment: any, patient: any, invoice: any, receiv
   return true;
 };
 
-const downloadReceiptPdf = (payment: any, patient: any, invoice: any, receiver: any, currency: string) => {
+const downloadReceiptPdf = (
+  payment: Payment,
+  customer: Customer | undefined,
+  invoice: Invoice | undefined,
+  receiver: User | undefined,
+  currency: string,
+  storeName: string,
+) => {
   const doc = new jsPDF({ unit: "pt", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 48;
@@ -292,7 +351,7 @@ const downloadReceiptPdf = (payment: any, patient: any, invoice: any, receiver: 
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(26);
-  doc.text("Amani Eye Practice", margin, 42);
+  doc.text(storeName, margin, 42);
   doc.setFontSize(11);
   doc.text("Payment receipt · Proof of payment", margin, 66);
 
@@ -307,12 +366,19 @@ const downloadReceiptPdf = (payment: any, patient: any, invoice: any, receiver: 
   doc.setFontSize(11);
   const details = [
     formatReceiptLine("Date", new Date(payment.date).toLocaleString()),
-    formatReceiptLine("Patient", patient ? `${patient.firstName} ${patient.lastName}` : "Unknown patient"),
+    formatReceiptLine("Customer", customer?.companyName || customer?.name || "Walk-in customer"),
     formatReceiptLine("Invoice", invoice?.invoiceNumber ?? "Unknown invoice"),
     formatReceiptLine("Method", payment.method.replace(/_/g, " ")),
     formatReceiptLine("Reference", payment.reference || "—"),
     formatReceiptLine("Received by", receiver?.fullName ?? "Unknown"),
-    formatReceiptLine("Amount", new Intl.NumberFormat("en-KE", { style: "currency", currency, minimumFractionDigits: 2 }).format(payment.amount)),
+    formatReceiptLine(
+      "Amount",
+      new Intl.NumberFormat("en-KE", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: 2,
+      }).format(payment.amount),
+    ),
   ];
 
   details.forEach((line) => {
@@ -323,6 +389,33 @@ const downloadReceiptPdf = (payment: any, patient: any, invoice: any, receiver: 
     doc.text(line, margin, y);
     y += 20;
   });
+
+  const invoiceItems = Array.isArray(invoice?.items) ? invoice.items : [];
+  if (invoiceItems.length > 0) {
+    y += 8;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Items and serial numbers", margin, y);
+    y += 18;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    for (const item of invoiceItems) {
+      const serialNumbers =
+        Array.isArray(item.serialNumbers) && item.serialNumbers.length > 0
+          ? item.serialNumbers.join(", ")
+          : "—";
+      const itemLines = doc.splitTextToSize(
+        `${item.description || "Product"} · Qty ${item.quantity ?? 0} · Serial number(s): ${serialNumbers}`,
+        pageWidth - margin * 2,
+      );
+      if (y + itemLines.length * 14 > 760) {
+        doc.addPage();
+        y = 52;
+      }
+      doc.text(itemLines, margin, y);
+      y += itemLines.length * 14 + 4;
+    }
+  }
 
   y += 16;
   doc.setDrawColor(203, 213, 225);
@@ -382,10 +475,12 @@ function Payments() {
   const filteredPayments = [...db.payments]
     .sort((a, b) => b.date.localeCompare(a.date))
     .filter((payment) => {
-      const patient = db.patients.find((item) => item.id === payment.patientId);
+      const customer = db.customers.find((item) => item.id === payment.customerId);
       const invoice = db.invoices.find((item) => item.id === payment.invoiceId);
+      const serialNumbers =
+        invoice?.items.flatMap((item) => item.serialNumbers ?? []).join(" ") ?? "";
       const matchesSearch =
-        `${payment.receiptNumber} ${patient?.firstName ?? ""} ${patient?.lastName ?? ""} ${invoice?.invoiceNumber ?? ""} ${payment.reference ?? ""}`
+        `${payment.receiptNumber} ${customer?.name ?? ""} ${customer?.companyName ?? ""} ${invoice?.invoiceNumber ?? ""} ${payment.reference ?? ""} ${serialNumbers}`
           .toLowerCase()
           .includes(search.toLowerCase());
       return (
@@ -428,14 +523,14 @@ function Payments() {
       await createRecord("payments", {
         receiptNumber,
         invoiceId: invoice.id,
-        patientId: invoice.patientId,
+        customerId: invoice.customerId,
         amount: value,
         method,
-        reference: reference.trim() || undefined,
+        ...(reference.trim() ? { reference: reference.trim() } : {}),
         date: nowISO(),
         receivedBy: user.id,
         status: "confirmed",
-        notes: notes.trim() || undefined,
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
       });
       const paidAfterPayment = currentTotals.paid + value;
       await updateRecord("invoices", invoice.id, {
@@ -484,73 +579,142 @@ function Payments() {
     const payment = db.payments.find((item) => item.id === paymentId);
     if (!payment) return;
 
-    const patient = db.patients.find((item) => item.id === payment.patientId);
+    const customer = db.customers.find((item) => item.id === payment.customerId);
     const invoice = db.invoices.find((item) => item.id === payment.invoiceId);
     const receiver = db.users.find((item) => item.id === payment.receivedBy);
 
-    createPrintableReceipt(payment, patient, invoice, receiver, db.settings.currency);
+    createPrintableReceipt(
+      payment,
+      customer,
+      invoice,
+      receiver,
+      db.settings.currency,
+      db.settings.storeName,
+    );
   };
 
   const handleReceiptDownload = (paymentId: string) => {
     const payment = db.payments.find((item) => item.id === paymentId);
     if (!payment) return;
 
-    const patient = db.patients.find((item) => item.id === payment.patientId);
+    const customer = db.customers.find((item) => item.id === payment.customerId);
     const invoice = db.invoices.find((item) => item.id === payment.invoiceId);
     const receiver = db.users.find((item) => item.id === payment.receivedBy);
 
-    downloadReceiptPdf(payment, patient, invoice, receiver, db.settings.currency);
+    downloadReceiptPdf(
+      payment,
+      customer,
+      invoice,
+      receiver,
+      db.settings.currency,
+      db.settings.storeName,
+    );
     toast.success(`Receipt ${payment.receiptNumber} downloaded`);
   };
 
   return (
-    <>
-      <PageHeader
-        title="Payments"
-        subtitle={`${db.payments.length} receipts recorded`}
-        actions={
+    <div className="payments-page space-y-5">
+      <section className="payments-hero">
+        <div className="payments-hero-content">
+          <div className="payments-eyebrow">
+            <span className="payments-eyebrow-icon">
+              <Wallet className="size-4" />
+            </span>
+            FINANCE OVERVIEW
+          </div>
+          <h1>Payments</h1>
+          <p>Keep every transaction clear, accounted for, and easy to find.</p>
+          <div className="payments-hero-meta">
+            <span>
+              <Receipt className="size-3.5" /> {db.payments.length} receipts recorded
+            </span>
+            <span className="payments-meta-divider" />
+            <span>
+              <ArrowDownLeft className="size-3.5" />{" "}
+              {db.payments.filter((payment) => payment.status === "confirmed").length} confirmed
+            </span>
+          </div>
+        </div>
+        <div className="payments-hero-side">
+          <div className="payments-hero-orbit payments-orbit-one" />
+          <div className="payments-hero-orbit payments-orbit-two" />
+          <div className="payments-hero-card">
+            <div className="payments-hero-card-icon">
+              <CreditCard className="size-5" />
+            </div>
+            <span>Collected to date</span>
+            <strong>{money(confirmedTotal, db.settings.currency)}</strong>
+            <small>Across all confirmed payments</small>
+          </div>
+        </div>
+        <div className="payments-hero-action">
           <Button
             onClick={() => setShowDialog(true)}
             disabled={invoicesWithBalance.length === 0 || !user}
-            className="rounded-full"
+            className="payments-record-button rounded-full"
           >
             <Receipt className="size-4" /> Record payment
           </Button>
-        }
-      />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Stat
-          label="Received"
-          value={money(confirmedTotal, db.settings.currency)}
-          hint="Confirmed payments"
-          accent="accent"
-        />
-        <Stat
-          label="Outstanding"
-          value={money(outstandingTotal, db.settings.currency)}
-          hint="Across open invoices"
-          accent="ink"
-        />
-        <Stat
-          label="Receipts"
-          value={db.payments.length}
-          hint={`${db.payments.filter((payment) => payment.status === "confirmed").length} confirmed`}
-          accent="info"
-        />
+        </div>
+      </section>
+
+      <div className="payments-stats">
+        <article className="payments-stat-card payments-stat-received">
+          <div className="payments-stat-top">
+            <span className="payments-stat-icon">
+              <ArrowDownLeft className="size-5" />
+            </span>
+            <span className="payments-stat-label">Received</span>
+          </div>
+          <p className="payments-stat-value">{money(confirmedTotal, db.settings.currency)}</p>
+          <p className="payments-stat-hint">Confirmed payments</p>
+        </article>
+        <article className="payments-stat-card payments-stat-outstanding">
+          <div className="payments-stat-top">
+            <span className="payments-stat-icon">
+              <Wallet className="size-5" />
+            </span>
+            <span className="payments-stat-label">Outstanding</span>
+          </div>
+          <p className="payments-stat-value">{money(outstandingTotal, db.settings.currency)}</p>
+          <p className="payments-stat-hint">Across open invoices</p>
+        </article>
+        <article className="payments-stat-card payments-stat-receipts">
+          <div className="payments-stat-top">
+            <span className="payments-stat-icon">
+              <Receipt className="size-5" />
+            </span>
+            <span className="payments-stat-label">Receipts</span>
+          </div>
+          <p className="payments-stat-value">{db.payments.length}</p>
+          <p className="payments-stat-hint">
+            {db.payments.filter((payment) => payment.status === "confirmed").length} confirmed
+          </p>
+        </article>
       </div>
 
-      <Panel>
-        <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search receipt, invoice, patient..."
-            aria-label="Search payments"
-          />
+      <Panel className="payments-ledger-panel !p-0">
+        <div className="payments-ledger-heading">
+          <div>
+            <h2>Payment activity</h2>
+            <p>Search and manage your latest transactions</p>
+          </div>
+          <span className="payments-result-count">{filteredPayments.length} results</span>
+        </div>
+        <div className="payments-toolbar">
+          <label className="payments-search">
+            <Search className="size-4" aria-hidden="true" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search receipt, invoice, customer, or serial number..."
+              aria-label="Search payments"
+            />
+          </label>
           <select
             value={statusFilter}
             onChange={(event) => setStatusFilter(event.target.value)}
-            className={selectCls}
+            className={`${selectCls} payments-select`}
             aria-label="Filter by payment status"
           >
             <option value="all">All statuses</option>
@@ -561,7 +725,7 @@ function Payments() {
           <select
             value={methodFilter}
             onChange={(event) => setMethodFilter(event.target.value)}
-            className={selectCls}
+            className={`${selectCls} payments-select`}
             aria-label="Filter by payment method"
           >
             <option value="all">All methods</option>
@@ -573,19 +737,25 @@ function Payments() {
           </select>
         </div>
         {filteredPayments.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            {search || statusFilter !== "all" || methodFilter !== "all"
-              ? "No payments match these filters"
-              : "No payments recorded"}
-          </p>
+          <div className="payments-empty">
+            <span className="payments-empty-icon">
+              <Receipt className="size-5" />
+            </span>
+            <p>
+              {search || statusFilter !== "all" || methodFilter !== "all"
+                ? "No payments match these filters"
+                : "No payments recorded"}
+            </p>
+            <span>Try adjusting your search or filters.</span>
+          </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className={tableCls}>
+          <div className="payments-table-wrap overflow-x-auto">
+            <table className={`${tableCls} payments-table`}>
               <thead>
                 <tr>
                   <th>Receipt</th>
                   <th>Date</th>
-                  <th>Patient</th>
+                  <th>Customer</th>
                   <th>Invoice</th>
                   <th>Method</th>
                   <th>Reference</th>
@@ -597,7 +767,7 @@ function Payments() {
               </thead>
               <tbody>
                 {filteredPayments.map((payment) => {
-                  const patient = db.patients.find((item) => item.id === payment.patientId);
+                  const customer = db.customers.find((item) => item.id === payment.customerId);
                   const invoice = db.invoices.find((item) => item.id === payment.invoiceId);
                   const receiver = db.users.find((item) => item.id === payment.receivedBy);
                   return (
@@ -605,13 +775,13 @@ function Payments() {
                       <td className="font-mono">{payment.receiptNumber}</td>
                       <td>{new Date(payment.date).toLocaleString()}</td>
                       <td>
-                        {patient ? (
+                        {customer ? (
                           <Link
-                            to="/patients/$id"
-                            params={{ id: patient.id }}
+                            to="/customers/$id"
+                            params={{ id: customer.id }}
                             className="font-semibold hover:underline"
                           >
-                            {patient.firstName} {patient.lastName}
+                            {customer.companyName || customer.name}
                           </Link>
                         ) : (
                           "Unknown"
@@ -620,7 +790,7 @@ function Payments() {
                       <td>{invoice?.invoiceNumber ?? "Unknown"}</td>
                       <td className="capitalize">{payment.method.replace(/_/g, " ")}</td>
                       <td>{payment.reference || "—"}</td>
-                      <td className="font-semibold">
+                      <td className="payments-amount font-semibold">
                         {money(payment.amount, db.settings.currency)}
                       </td>
                       <td>
@@ -688,11 +858,11 @@ function Payments() {
               >
                 <option value="">Select invoice</option>
                 {invoicesWithBalance.map((invoice) => {
-                  const patient = db.patients.find((item) => item.id === invoice.patientId);
+                  const customer = db.customers.find((item) => item.id === invoice.customerId);
                   const balance = invoiceTotals(invoice, db).balance;
                   return (
                     <option key={invoice.id} value={invoice.id}>
-                      {invoice.invoiceNumber} · {patient?.firstName} {patient?.lastName} ·{" "}
+                      {invoice.invoiceNumber} · {customer?.companyName || customer?.name} ·{" "}
                       {money(balance, db.settings.currency)}
                     </option>
                   );
@@ -751,6 +921,6 @@ function Payments() {
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

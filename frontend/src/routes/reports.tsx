@@ -22,13 +22,13 @@ import {
   fetchAnalytics,
   invoiceTotals,
   money,
-  patientName,
+  customerName,
   type SeriesPoint,
 } from "@/services/store";
-import { Download, Printer } from "lucide-react";
+import { CalendarDays, Download, Printer, Search } from "lucide-react";
 
 export const Route = createFileRoute("/reports")({
-  head: () => meta("Reports", "Reports — Amani Eye practice manager."),
+  head: () => meta("Reports", "Laptop store sales and inventory reports."),
   component: () => (
     <AppShell module="reports">
       <Reports />
@@ -46,6 +46,7 @@ interface SupplierProductSale {
   quantity: number;
   revenue: number;
   invoices: Set<string>;
+  serialNumbers: Set<string>;
   searchText: string;
 }
 
@@ -57,6 +58,7 @@ interface ReportRecord {
   status: string;
   value?: number;
   searchText: string;
+  serialNumbers?: string;
 }
 
 const rangeStart = (range: RangeKey) => {
@@ -119,8 +121,8 @@ function Reports() {
     (payment) => payment.status === "confirmed" && inDateRange(payment.date),
   );
   const revenue = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const visits = db.visits.filter((visit) => inDateRange(visit.date));
-  const newPatients = db.patients.filter((patient) => inDateRange(patient.registeredAt));
+  const salesInRange = db.invoices.filter((invoice) => inDateRange(invoice.date));
+  const newCustomers = db.customers.filter((customer) => inDateRange(customer.registeredAt));
   const invoicesInRange = db.invoices.filter((invoice) => inDateRange(invoice.date));
   const outstandingInvoices = db.invoices
     .map((invoice) => ({ invoice, balance: invoiceTotals(invoice, db).balance }))
@@ -139,8 +141,7 @@ function Reports() {
   db.invoices
     .filter(
       (invoice) =>
-        inDateRange(invoice.date) &&
-        !["draft", "cancelled", "refunded"].includes(invoice.status),
+        inDateRange(invoice.date) && !["draft", "cancelled", "refunded"].includes(invoice.status),
     )
     .forEach((invoice) => {
       invoice.items.forEach((item) => {
@@ -160,18 +161,29 @@ function Reports() {
           quantity: 0,
           revenue: 0,
           invoices: new Set<string>(),
-          searchText: `${supplierName} ${productName} ${product?.sku ?? ""} ${product?.brand ?? ""} ${item.description}`.toLowerCase(),
+          serialNumbers: new Set<string>(),
+          searchText:
+            `${supplierName} ${productName} ${product?.sku ?? ""} ${product?.brand ?? ""} ${item.description}`.toLowerCase(),
         };
         sale.quantity += item.quantity;
         sale.revenue += item.quantity * item.unitPrice - item.discount;
         sale.invoices.add(invoice.id);
+        item.serialNumbers?.forEach((serialNumber) =>
+          sale.serialNumbers.add(serialNumber.toLowerCase()),
+        );
         supplierSalesByProduct.set(key, sale);
       });
     });
 
   const supplierSales = [...supplierSalesByProduct.values()]
     .map((sale) => ({ ...sale, invoiceCount: sale.invoices.size }))
-    .filter((sale) => sale.searchText.includes(search.trim().toLowerCase()))
+    .filter((sale) => {
+      const query = search.trim().toLowerCase();
+      return (
+        sale.searchText.includes(query) ||
+        [...sale.serialNumbers].some((serialNumber) => serialNumber.includes(query))
+      );
+    })
     .sort((a, b) => b.revenue - a.revenue);
 
   const reportRecords: ReportRecord[] = [];
@@ -183,6 +195,7 @@ function Reports() {
     status: string,
     value: number | undefined,
     searchable: unknown,
+    serialNumbers?: string,
   ) => {
     reportRecords.push({
       type,
@@ -191,7 +204,9 @@ function Reports() {
       details,
       status,
       value,
-      searchText: `${type} ${record} ${details} ${status} ${JSON.stringify(searchable)}`.toLowerCase(),
+      searchText:
+        `${type} ${record} ${details} ${status} ${JSON.stringify(searchable)} ${serialNumbers ?? ""}`.toLowerCase(),
+      serialNumbers,
     });
   };
 
@@ -204,17 +219,6 @@ function Reports() {
       "",
       undefined,
       supplier,
-    ),
-  );
-  db.providers.forEach((provider) =>
-    addReportRecord(
-      "Insurance provider",
-      undefined,
-      provider.name,
-      `${provider.code} · ${provider.contactPerson} · ${provider.phone}`,
-      provider.status,
-      undefined,
-      provider,
     ),
   );
   db.users.forEach((staffMember) =>
@@ -240,28 +244,30 @@ function Reports() {
       { ...product, supplier: supplier?.name },
     );
   });
-  db.patients.forEach((patient) =>
+  db.customers.forEach((customer) =>
     addReportRecord(
-      "Patient",
-      patient.registeredAt,
-      patientName(patient),
-      `${patient.patientNumber} · ${patient.phone} · ${patient.email ?? ""}`,
-      patient.status,
+      "Customer",
+      customer.registeredAt,
+      customerName(customer),
+      `${customer.customerNumber} · ${customer.phone} · ${customer.email ?? ""}`,
+      customer.status,
       undefined,
-      patient,
+      customer,
     ),
   );
   db.invoices.forEach((invoice) => {
-    const patient = db.patients.find((item) => item.id === invoice.patientId);
+    const customer = db.customers.find((item) => item.id === invoice.customerId);
     const totals = invoiceTotals(invoice, db);
+    const serialNumbers = invoice.items.flatMap((item) => item.serialNumbers ?? []).join(" ");
     addReportRecord(
       "Invoice",
       invoice.date,
       invoice.invoiceNumber,
-      `${patientName(patient)} · ${invoice.items.map((item) => item.description).join(", ")}`,
+      `${customerName(customer)} · ${invoice.items.map((item) => item.description).join(", ")}${serialNumbers ? ` · Serial: ${serialNumbers}` : ""}`,
       invoice.status,
       totals.total,
-      { ...invoice, patient: patientName(patient) },
+      { ...invoice, customer: customerName(customer), serialNumbers },
+      serialNumbers,
     );
     if (!["draft", "cancelled", "refunded"].includes(invoice.status)) {
       invoice.items.forEach((item) => {
@@ -269,65 +275,37 @@ function Reports() {
         const supplierId = item.supplierId || product?.supplierId;
         if (!product && !supplierId) return;
         const supplier = db.suppliers.find((candidate) => candidate.id === supplierId);
+        const itemSerialNumbers = item.serialNumbers?.join(" ") ?? "";
         addReportRecord(
           "Supplier product sale",
           invoice.date,
           product?.name ?? item.description,
-          `${supplier?.name ?? "Unassigned supplier"} · ${product?.sku ?? "No SKU"} · ${invoice.invoiceNumber} · ${patientName(patient)} · ${item.quantity} units`,
+          `${supplier?.name ?? "Unassigned supplier"} · ${product?.sku ?? "No SKU"} · ${invoice.invoiceNumber} · ${customerName(customer)} · ${item.quantity} units${itemSerialNumbers ? ` · Serial: ${itemSerialNumbers}` : ""}`,
           invoice.status,
           item.quantity * item.unitPrice - item.discount,
-          { ...item, supplier: supplier?.name, product: product?.name, invoice: invoice.invoiceNumber },
+          {
+            ...item,
+            supplier: supplier?.name,
+            product: product?.name,
+            invoice: invoice.invoiceNumber,
+            serialNumbers: itemSerialNumbers,
+          },
+          itemSerialNumbers,
         );
       });
     }
   });
   db.payments.forEach((payment) => {
-    const patient = db.patients.find((item) => item.id === payment.patientId);
+    const customer = db.customers.find((item) => item.id === payment.customerId);
     const invoice = db.invoices.find((item) => item.id === payment.invoiceId);
     addReportRecord(
       "Payment",
       payment.date,
       payment.receiptNumber,
-      `${patientName(patient)} · ${invoice?.invoiceNumber ?? "Unknown invoice"} · ${payment.method}`,
+      `${customerName(customer)} · ${invoice?.invoiceNumber ?? "Unknown invoice"} · ${payment.method}`,
       payment.status,
       payment.amount,
-      { ...payment, patient: patientName(patient), invoice: invoice?.invoiceNumber },
-    );
-  });
-  db.appointments.forEach((appointment) => {
-    const patient = db.patients.find((item) => item.id === appointment.patientId);
-    addReportRecord(
-      "Appointment",
-      appointment.date,
-      patientName(patient),
-      `${appointment.type.replace(/_/g, " ")} · ${appointment.reason}`,
-      appointment.status,
-      undefined,
-      appointment,
-    );
-  });
-  db.visits.forEach((visit) => {
-    const patient = db.patients.find((item) => item.id === visit.patientId);
-    addReportRecord(
-      "Clinical visit",
-      visit.date,
-      visit.visitNumber,
-      `${patientName(patient)} · ${visit.chiefComplaint.reason} · ${visit.findings}`,
-      visit.status,
-      undefined,
-      visit,
-    );
-  });
-  db.prescriptions.forEach((prescription) => {
-    const patient = db.patients.find((item) => item.id === prescription.patientId);
-    addReportRecord(
-      "Prescription",
-      prescription.date,
-      prescription.prescriptionNumber,
-      `${patientName(patient)} · ${prescription.lensType} · ${prescription.lensMaterial}`,
-      "",
-      undefined,
-      prescription,
+      { ...payment, customer: customerName(customer), invoice: invoice?.invoiceNumber },
     );
   });
   db.stock.forEach((transaction) => {
@@ -341,20 +319,6 @@ function Reports() {
       transaction.type,
       undefined,
       { ...transaction, product: product?.name, supplier: supplier?.name },
-    );
-  });
-  db.claims.forEach((claim) => {
-    const patient = db.patients.find((item) => item.id === claim.patientId);
-    const provider = db.providers.find((item) => item.id === claim.providerId);
-    const invoice = db.invoices.find((item) => item.id === claim.invoiceId);
-    addReportRecord(
-      "Insurance claim",
-      claim.submittedAt ?? undefined,
-      claim.claimNumber,
-      `${patientName(patient)} · ${provider?.name ?? "Unknown provider"} · ${invoice?.invoiceNumber ?? "Unknown invoice"}`,
-      claim.status,
-      claim.claimedAmount,
-      { ...claim, patient: patientName(patient), provider: provider?.name },
     );
   });
   db.audit.forEach((entry) => {
@@ -390,8 +354,8 @@ function Reports() {
       ["Metric", "Value"],
       ["Confirmed revenue", revenue],
       ["Confirmed payments", payments.length],
-      ["Visits", visits.length],
-      ["New patients", newPatients.length],
+      ["Sales", salesInRange.length],
+      ["New customers", newCustomers.length],
       ["Invoices issued", invoicesInRange.length],
       ["Suppliers", db.suppliers.length],
       ["Products in catalog", db.products.length],
@@ -400,46 +364,66 @@ function Reports() {
       ["Products at or below reorder level", lowStockCount],
       ["Search", search || "All records"],
       [],
-      ["Supplier", "Product", "SKU", "Quantity sold", "Sales value", "Invoices"],
-      ...supplierSales.map((sale) => [
-        sale.supplierName,
-        sale.productName,
-        sale.sku,
-        sale.quantity,
-        sale.revenue,
-        sale.invoiceCount,
-      ]),
+      ["Supplier", "Product", "SKU", "Quantity sold", "Invoices", "Serial Numbers", "Sales value"],
+      ...supplierSales.map((sale) => {
+        const serialNumbersForSale = db.invoices
+          .filter(
+            (invoice) =>
+              inDateRange(invoice.date) &&
+              !["draft", "cancelled", "refunded"].includes(invoice.status) &&
+              sale.invoices.has(invoice.id),
+          )
+          .flatMap((invoice) =>
+            invoice.items
+              .filter((item) => {
+                const product = db.products.find((p) => p.id === item.productId);
+                const supplierId = item.supplierId || product?.supplierId;
+                const supplier = db.suppliers.find((s) => s.id === supplierId);
+                return (
+                  supplier?.name === sale.supplierName &&
+                  (product?.name ?? item.description) === sale.productName
+                );
+              })
+              .flatMap((item) => item.serialNumbers ?? []),
+          )
+          .join(", ");
+
+        return [
+          sale.supplierName,
+          sale.productName,
+          sale.sku,
+          sale.quantity,
+          sale.invoiceCount,
+          serialNumbersForSale || "",
+          sale.revenue,
+        ];
+      }),
       [],
-      ["Record type", "Date", "Record", "Details", "Status", "Value"],
+      ["Record type", "Date", "Record", "Details", "Serial Numbers", "Status", "Value"],
       ...matchingRecords.map((record) => [
         record.type,
         record.date ?? "",
         record.record,
         record.details,
+        record.serialNumbers ?? "",
         record.status,
         record.value ?? "",
       ]),
       [],
-      ["Trend", "Revenue", "Visits", "New patients", "Returning visits"],
-      ...chartData.map((point) => [
-        point.label,
-        point.revenue,
-        point.visits,
-        point.newPatients,
-        point.returning,
-      ]),
+      ["Trend", "Revenue", "Sales", "New customers"],
+      ...chartData.map((point) => [point.label, point.revenue, point.sales, point.newCustomers]),
     ];
     downloadCsv(
-      `amani-report-${range === "week" ? "weekly" : "six-months"}-${new Date().toISOString().slice(0, 10)}.csv`,
+      `laptop-store-report-${range === "week" ? "weekly" : "six-months"}-${new Date().toISOString().slice(0, 10)}.csv`,
       rows,
     );
   };
 
   return (
-    <>
+    <div className="mx-auto max-w-[1600px] space-y-6">
       <PageHeader
         title="Reports"
-        subtitle="Practice activity and financial performance"
+        subtitle="A clear overview of sales, collections and inventory performance."
         actions={
           <>
             <Button variant="outline" onClick={() => window.print()}>
@@ -452,8 +436,34 @@ function Reports() {
         }
       />
 
-      <Panel className="mb-6 print:hidden">
-        <div className="flex flex-wrap items-end gap-3">
+      <Panel className="print:hidden">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex items-center gap-3">
+            <span className="flex size-10 items-center justify-center rounded-xl bg-info-soft text-info">
+              <CalendarDays className="size-5" />
+            </span>
+            <div>
+              <h2 className="font-semibold">Report filters</h2>
+              <p className="text-sm text-muted-foreground">
+                Choose a period or search across your records.
+              </p>
+            </div>
+          </div>
+          {(fromDate || toDate || search) && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setFromDate("");
+                setToDate("");
+                setSearch("");
+              }}
+            >
+              Clear filters
+            </Button>
+          )}
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_2fr]">
           <label className="flex flex-col gap-1.5 text-sm font-medium">
             Reporting period
             <select
@@ -487,193 +497,150 @@ function Reports() {
               onChange={(event) => setToDate(event.target.value)}
             />
           </label>
-          <label className="flex min-w-56 flex-1 flex-col gap-1.5 text-sm font-medium">
+          <label className="flex flex-col gap-1.5 text-sm font-medium">
             Search all records
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Supplier, product, patient, invoice, receipt..."
-              aria-label="Search all report records"
-            />
+            <span className="relative">
+              <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+              <Input
+                className="pl-9"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Supplier, product, customer, invoice, receipt, serial number..."
+                aria-label="Search all report records"
+              />
+            </span>
           </label>
-          {(fromDate || toDate || search) && (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setFromDate("");
-                setToDate("");
-                setSearch("");
-              }}
-            >
-              Clear filters
-            </Button>
-          )}
         </div>
       </Panel>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Stat
-          label="Confirmed revenue"
-          value={money(revenue, db.settings.currency)}
-          hint={`${payments.length} receipts in period`}
-          accent="accent"
-        />
-        <Stat
-          label="Clinical visits"
-          value={visits.length}
-          hint={`${visits.filter((visit) => visit.status === "completed").length} completed`}
-          accent="info"
-        />
-        <Stat
-          label="New patients"
-          value={newPatients.length}
-          hint="Registrations in period"
-          accent="brand"
-        />
-        <Stat
-          label="Outstanding balances"
-          value={money(
-            outstandingInvoices.reduce((sum, item) => sum + item.balance, 0),
-            db.settings.currency,
-          )}
-          hint={`${outstandingInvoices.length} open invoices`}
-          accent="ink"
-        />
-        <Stat
-          label="Products in stock"
-          value={db.products.reduce((sum, product) => sum + product.quantity, 0)}
-          hint={`${db.products.length} catalog products`}
-          accent="info"
-        />
-        <Stat
-          label="Inventory cost value"
-          value={money(inventoryValue, db.settings.currency)}
-          hint="Current stock at recorded cost price"
-          accent="brand"
-        />
-        <Stat
-          label="Low stock products"
-          value={lowStockCount}
-          hint="At or below reorder level"
-          accent="accent"
-        />
-      </div>
+      <section aria-label="Key figures">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Key figures
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            {start.toLocaleDateString()} – {end.toLocaleDateString()}
+          </span>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <Stat
+            label="Collected revenue"
+            value={money(revenue, db.settings.currency)}
+            hint={`${payments.length} confirmed payments`}
+            accent="brand"
+          />
+          <Stat
+            label="Outstanding balances"
+            value={money(
+              outstandingInvoices.reduce((sum, item) => sum + item.balance, 0),
+              db.settings.currency,
+            )}
+            hint={`${outstandingInvoices.length} open invoices`}
+            accent="ink"
+          />
+          <Stat
+            label="Products in stock"
+            value={db.products.reduce((sum, product) => sum + product.quantity, 0)}
+            hint={`${db.products.length} catalog products`}
+            accent="info"
+          />
+          <Stat
+            label="Inventory cost value"
+            value={money(inventoryValue, db.settings.currency)}
+            hint="Current stock at recorded cost price"
+            accent="accent"
+          />
+        </div>
+      </section>
 
       {analyticsError && (
-        <p role="alert" className="mb-4 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
           Trend analytics could not be loaded. Summary figures remain available from current
           records.
         </p>
       )}
-      <div className="mb-6 grid gap-6 xl:grid-cols-2">
-        <Panel title={`Revenue · ${range === "week" ? "last 7 days" : "last 6 months"}`}>
-          {chartData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer>
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="reportRevenue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="var(--brand)" stopOpacity={0.38} />
-                      <stop offset="100%" stopColor="var(--brand)" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-                  <YAxis
-                    stroke="var(--muted-foreground)"
-                    fontSize={12}
-                    tickFormatter={(value) => `${Math.round(value / 1000)}k`}
-                  />
-                  <Tooltip formatter={(value: number) => money(value, db.settings.currency)} />
-                  <Area
-                    type="monotone"
-                    dataKey="revenue"
-                    name="Revenue"
-                    stroke="var(--brand)"
-                    strokeWidth={2.5}
-                    fill="url(#reportRevenue)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              {analyticsError ? "No trend data available" : "Loading trend data..."}
-            </p>
-          )}
-        </Panel>
-        <Panel title="Visits and patient growth">
-          {chartData.length > 0 ? (
-            <div className="h-64">
-              <ResponsiveContainer>
-                <BarChart data={chartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
-                  <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-                  <YAxis stroke="var(--muted-foreground)" fontSize={12} allowDecimals={false} />
-                  <Tooltip />
-                  <Bar dataKey="visits" name="Visits" fill="var(--info)" radius={[3, 3, 0, 0]} />
-                  <Bar
-                    dataKey="newPatients"
-                    name="New patients"
-                    fill="var(--accent)"
-                    radius={[3, 3, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="py-8 text-center text-sm text-muted-foreground">
-              No activity trend data available
-            </p>
-          )}
-        </Panel>
-      </div>
 
       <Panel
         title="Products sold by supplier"
         action={
-          <span className="text-sm text-muted-foreground">
-            {supplierSales.length} products · {money(
+          <span className="text-right text-sm text-muted-foreground">
+            <span className="block font-semibold text-foreground">
+              {supplierSales.length} products
+            </span>
+            {money(
               supplierSales.reduce((sum, sale) => sum + sale.revenue, 0),
               db.settings.currency,
             )}
           </span>
         }
-        className="mb-6"
       >
-        <p className="mb-3 text-sm text-muted-foreground">
+        <p className="mb-4 text-sm text-muted-foreground">
           Sales attributed to the supplier saved on each invoice item for the selected period.
         </p>
         {supplierSales.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
             No supplier product sales match this period and search.
           </p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto rounded-lg border">
             <table className={tableCls}>
-              <thead>
+              <thead className="bg-muted/50">
                 <tr>
                   <th>Supplier</th>
                   <th>Product</th>
                   <th>SKU</th>
                   <th>Quantity sold</th>
                   <th>Invoices</th>
-                  <th>Sales value</th>
+                  <th>Serial numbers</th>
+                  <th className="text-right">Sales value</th>
                 </tr>
               </thead>
               <tbody>
-                {supplierSales.map((sale) => (
-                  <tr key={sale.key}>
-                    <td className="font-medium">{sale.supplierName}</td>
-                    <td>{sale.productName}</td>
-                    <td className="font-mono">{sale.sku}</td>
-                    <td>{sale.quantity}</td>
-                    <td>{sale.invoiceCount}</td>
-                    <td className="font-semibold">
-                      {money(sale.revenue, db.settings.currency)}
-                    </td>
-                  </tr>
-                ))}
+                {supplierSales.map((sale) => {
+                  const serialNumbersForSale = db.invoices
+                    .filter(
+                      (invoice) =>
+                        inDateRange(invoice.date) &&
+                        !["draft", "cancelled", "refunded"].includes(invoice.status) &&
+                        sale.invoices.has(invoice.id),
+                    )
+                    .flatMap((invoice) =>
+                      invoice.items
+                        .filter((item) => {
+                          const product = db.products.find((p) => p.id === item.productId);
+                          const supplierId = item.supplierId || product?.supplierId;
+                          const supplier = db.suppliers.find((s) => s.id === supplierId);
+                          return (
+                            supplier?.name === sale.supplierName &&
+                            (product?.name ?? item.description) === sale.productName
+                          );
+                        })
+                        .flatMap((item) => item.serialNumbers ?? []),
+                    )
+                    .join(", ");
+
+                  return (
+                    <tr key={sale.key}>
+                      <td className="font-medium">{sale.supplierName}</td>
+                      <td>{sale.productName}</td>
+                      <td className="font-mono text-xs">{sale.sku}</td>
+                      <td>{sale.quantity}</td>
+                      <td>{sale.invoiceCount}</td>
+                      <td
+                        className="max-w-xs truncate font-mono text-xs"
+                        title={serialNumbersForSale}
+                      >
+                        {serialNumbersForSale || "—"}
+                      </td>
+                      <td className="whitespace-nowrap text-right font-semibold">
+                        {money(sale.revenue, db.settings.currency)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -681,15 +648,22 @@ function Reports() {
       </Panel>
 
       <div className="grid gap-6 xl:grid-cols-2">
-        <Panel title="Collections by method">
+        <Panel
+          title="Collections by method"
+          action={
+            <span className="text-sm font-semibold text-muted-foreground">
+              {money(revenue, db.settings.currency)}
+            </span>
+          }
+        >
           {Object.keys(paymentMethods).length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
               No confirmed payments in this period
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border">
               <table className={tableCls}>
-                <thead>
+                <thead className="bg-muted/50">
                   <tr>
                     <th>Method</th>
                     <th>Receipts</th>
@@ -719,7 +693,7 @@ function Reports() {
         <Panel
           title="Outstanding invoices"
           action={
-            <span className="text-sm text-muted-foreground">
+            <span className="text-sm font-semibold text-muted-foreground">
               {money(
                 outstandingInvoices.reduce((sum, item) => sum + item.balance, 0),
                 db.settings.currency,
@@ -728,16 +702,16 @@ function Reports() {
           }
         >
           {outstandingInvoices.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
+            <p className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
               No outstanding invoices
             </p>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto rounded-lg border">
               <table className={tableCls}>
-                <thead>
+                <thead className="bg-muted/50">
                   <tr>
                     <th>Invoice</th>
-                    <th>Patient</th>
+                    <th>Customer</th>
                     <th>Due</th>
                     <th>Status</th>
                   </tr>
@@ -745,13 +719,15 @@ function Reports() {
                 <tbody>
                   {outstandingInvoices.slice(0, 8).map(({ invoice, balance }) => (
                     <tr key={invoice.id}>
-                      <td className="font-mono">{invoice.invoiceNumber}</td>
+                      <td className="font-mono text-xs">{invoice.invoiceNumber}</td>
                       <td>
-                        {patientName(
-                          db.patients.find((patient) => patient.id === invoice.patientId),
+                        {customerName(
+                          db.customers.find((customer) => customer.id === invoice.customerId),
                         )}
                       </td>
-                      <td className="font-semibold">{money(balance, db.settings.currency)}</td>
+                      <td className="whitespace-nowrap font-semibold">
+                        {money(balance, db.settings.currency)}
+                      </td>
                       <td>
                         <StatusBadge status={invoice.status} />
                       </td>
@@ -763,60 +739,6 @@ function Reports() {
           )}
         </Panel>
       </div>
-
-      <Panel
-        title="Search results across all records"
-        action={
-          <span className="text-sm text-muted-foreground">
-            {matchingRecords.length.toLocaleString()} records
-          </span>
-        }
-        className="mt-6"
-      >
-        {matchingRecords.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            No records match your search.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className={tableCls}>
-              <thead>
-                <tr>
-                  <th>Type</th>
-                  <th>Date</th>
-                  <th>Record</th>
-                  <th>Details</th>
-                  <th>Status</th>
-                  <th>Value</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matchingRecords.slice(0, 100).map((record, index) => (
-                  <tr key={`${record.type}-${record.record}-${record.date ?? "master"}-${index}`}>
-                    <td>{record.type}</td>
-                    <td className="whitespace-nowrap">
-                      {record.date ? new Date(record.date).toLocaleDateString() : "—"}
-                    </td>
-                    <td className="font-medium">{record.record}</td>
-                    <td className="max-w-sm truncate" title={record.details}>
-                      {record.details || "—"}
-                    </td>
-                    <td>{record.status ? <StatusBadge status={record.status} /> : "—"}</td>
-                    <td className="whitespace-nowrap">
-                      {record.value === undefined ? "—" : money(record.value, db.settings.currency)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {matchingRecords.length > 100 && (
-              <p className="mt-3 text-sm text-muted-foreground">
-                Showing the first 100 records. Export CSV to get all {matchingRecords.length} matches.
-              </p>
-            )}
-          </div>
-        )}
-      </Panel>
-    </>
+    </div>
   );
 }

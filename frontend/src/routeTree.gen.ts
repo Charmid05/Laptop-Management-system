@@ -11,23 +11,21 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
-import { Route as AppointmentsRouteImport } from './routes/appointments'
-import { Route as ClinicalRouteImport } from './routes/clinical'
-import { Route as InsuranceRouteImport } from './routes/insurance'
+import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as InventoryRouteImport } from './routes/inventory'
 import { Route as InvoicesRouteImport } from './routes/invoices'
 import { Route as LoginRouteImport } from './routes/login'
-import { Route as PatientsRouteImport } from './routes/patients'
 import { Route as PaymentsRouteImport } from './routes/payments'
-import { Route as PrescriptionsRouteImport } from './routes/prescriptions'
-import { Route as QueueRouteImport } from './routes/queue'
+import { Route as PurchasesRouteImport } from './routes/purchases'
 import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as ServiceRouteImport } from './routes/service'
 import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StockRouteImport } from './routes/stock'
 import { Route as SuppliersRouteImport } from './routes/suppliers'
-import { Route as ClinicalIdRouteImport } from './routes/clinical.$id'
+import { Route as CustomersIdRouteImport } from './routes/customers.$id'
+import { Route as CustomersNewRouteImport } from './routes/customers.new'
 import { Route as InvoicesIdRouteImport } from './routes/invoices.$id'
-import { Route as PatientsIdRouteImport } from './routes/patients.$id'
-import { Route as PatientsNewRouteImport } from './routes/patients.new'
+import { Route as PurchasesNewRouteImport } from './routes/purchases.new'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -39,19 +37,9 @@ const AdminRoute = AdminRouteImport.update({
   path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppointmentsRoute = AppointmentsRouteImport.update({
-  id: '/appointments',
-  path: '/appointments',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ClinicalRoute = ClinicalRouteImport.update({
-  id: '/clinical',
-  path: '/clinical',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const InsuranceRoute = InsuranceRouteImport.update({
-  id: '/insurance',
-  path: '/insurance',
+const CustomersRoute = CustomersRouteImport.update({
+  id: '/customers',
+  path: '/customers',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InventoryRoute = InventoryRouteImport.update({
@@ -69,24 +57,14 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PatientsRoute = PatientsRouteImport.update({
-  id: '/patients',
-  path: '/patients',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const PaymentsRoute = PaymentsRouteImport.update({
   id: '/payments',
   path: '/payments',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PrescriptionsRoute = PrescriptionsRouteImport.update({
-  id: '/prescriptions',
-  path: '/prescriptions',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const QueueRoute = QueueRouteImport.update({
-  id: '/queue',
-  path: '/queue',
+const PurchasesRoute = PurchasesRouteImport.update({
+  id: '/purchases',
+  path: '/purchases',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReportsRoute = ReportsRouteImport.update({
@@ -94,9 +72,19 @@ const ReportsRoute = ReportsRouteImport.update({
   path: '/reports',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ServiceRoute = ServiceRouteImport.update({
+  id: '/service',
+  path: '/service',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StockRoute = StockRouteImport.update({
+  id: '/stock',
+  path: '/stock',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SuppliersRoute = SuppliersRouteImport.update({
@@ -104,172 +92,158 @@ const SuppliersRoute = SuppliersRouteImport.update({
   path: '/suppliers',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClinicalIdRoute = ClinicalIdRouteImport.update({
+const CustomersIdRoute = CustomersIdRouteImport.update({
   id: '/$id',
   path: '/$id',
-  getParentRoute: () => ClinicalRoute,
+  getParentRoute: () => CustomersRoute,
+} as any)
+const CustomersNewRoute = CustomersNewRouteImport.update({
+  id: '/new',
+  path: '/new',
+  getParentRoute: () => CustomersRoute,
 } as any)
 const InvoicesIdRoute = InvoicesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
   getParentRoute: () => InvoicesRoute,
 } as any)
-const PatientsIdRoute = PatientsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PatientsRoute,
-} as any)
-const PatientsNewRoute = PatientsNewRouteImport.update({
+const PurchasesNewRoute = PurchasesNewRouteImport.update({
   id: '/new',
   path: '/new',
-  getParentRoute: () => PatientsRoute,
+  getParentRoute: () => PurchasesRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/appointments': typeof AppointmentsRoute
-  '/clinical': typeof ClinicalRouteWithChildren
-  '/insurance': typeof InsuranceRoute
+  '/customers': typeof CustomersRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/login': typeof LoginRoute
-  '/patients': typeof PatientsRouteWithChildren
   '/payments': typeof PaymentsRoute
-  '/prescriptions': typeof PrescriptionsRoute
-  '/queue': typeof QueueRoute
+  '/purchases': typeof PurchasesRouteWithChildren
   '/reports': typeof ReportsRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
   '/suppliers': typeof SuppliersRoute
-  '/clinical/$id': typeof ClinicalIdRoute
+  '/customers/$id': typeof CustomersIdRoute
+  '/customers/new': typeof CustomersNewRoute
   '/invoices/$id': typeof InvoicesIdRoute
-  '/patients/$id': typeof PatientsIdRoute
-  '/patients/new': typeof PatientsNewRoute
+  '/purchases/new': typeof PurchasesNewRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/appointments': typeof AppointmentsRoute
-  '/clinical': typeof ClinicalRouteWithChildren
-  '/insurance': typeof InsuranceRoute
+  '/customers': typeof CustomersRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/login': typeof LoginRoute
-  '/patients': typeof PatientsRouteWithChildren
   '/payments': typeof PaymentsRoute
-  '/prescriptions': typeof PrescriptionsRoute
-  '/queue': typeof QueueRoute
+  '/purchases': typeof PurchasesRouteWithChildren
   '/reports': typeof ReportsRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
   '/suppliers': typeof SuppliersRoute
-  '/clinical/$id': typeof ClinicalIdRoute
+  '/customers/$id': typeof CustomersIdRoute
+  '/customers/new': typeof CustomersNewRoute
   '/invoices/$id': typeof InvoicesIdRoute
-  '/patients/$id': typeof PatientsIdRoute
-  '/patients/new': typeof PatientsNewRoute
+  '/purchases/new': typeof PurchasesNewRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
-  '/appointments': typeof AppointmentsRoute
-  '/clinical': typeof ClinicalRouteWithChildren
-  '/insurance': typeof InsuranceRoute
+  '/customers': typeof CustomersRouteWithChildren
   '/inventory': typeof InventoryRoute
   '/invoices': typeof InvoicesRouteWithChildren
   '/login': typeof LoginRoute
-  '/patients': typeof PatientsRouteWithChildren
   '/payments': typeof PaymentsRoute
-  '/prescriptions': typeof PrescriptionsRoute
-  '/queue': typeof QueueRoute
+  '/purchases': typeof PurchasesRouteWithChildren
   '/reports': typeof ReportsRoute
+  '/service': typeof ServiceRoute
   '/settings': typeof SettingsRoute
+  '/stock': typeof StockRoute
   '/suppliers': typeof SuppliersRoute
-  '/clinical/$id': typeof ClinicalIdRoute
+  '/customers/$id': typeof CustomersIdRoute
+  '/customers/new': typeof CustomersNewRoute
   '/invoices/$id': typeof InvoicesIdRoute
-  '/patients/$id': typeof PatientsIdRoute
-  '/patients/new': typeof PatientsNewRoute
+  '/purchases/new': typeof PurchasesNewRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/admin'
-    | '/appointments'
-    | '/clinical'
-    | '/insurance'
+    | '/customers'
     | '/inventory'
     | '/invoices'
     | '/login'
-    | '/patients'
     | '/payments'
-    | '/prescriptions'
-    | '/queue'
+    | '/purchases'
     | '/reports'
+    | '/service'
     | '/settings'
+    | '/stock'
     | '/suppliers'
-    | '/clinical/$id'
+    | '/customers/$id'
+    | '/customers/new'
     | '/invoices/$id'
-    | '/patients/$id'
-    | '/patients/new'
+    | '/purchases/new'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/admin'
-    | '/appointments'
-    | '/clinical'
-    | '/insurance'
+    | '/customers'
     | '/inventory'
     | '/invoices'
     | '/login'
-    | '/patients'
     | '/payments'
-    | '/prescriptions'
-    | '/queue'
+    | '/purchases'
     | '/reports'
+    | '/service'
     | '/settings'
+    | '/stock'
     | '/suppliers'
-    | '/clinical/$id'
+    | '/customers/$id'
+    | '/customers/new'
     | '/invoices/$id'
-    | '/patients/$id'
-    | '/patients/new'
+    | '/purchases/new'
   id:
     | '__root__'
     | '/'
     | '/admin'
-    | '/appointments'
-    | '/clinical'
-    | '/insurance'
+    | '/customers'
     | '/inventory'
     | '/invoices'
     | '/login'
-    | '/patients'
     | '/payments'
-    | '/prescriptions'
-    | '/queue'
+    | '/purchases'
     | '/reports'
+    | '/service'
     | '/settings'
+    | '/stock'
     | '/suppliers'
-    | '/clinical/$id'
+    | '/customers/$id'
+    | '/customers/new'
     | '/invoices/$id'
-    | '/patients/$id'
-    | '/patients/new'
+    | '/purchases/new'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
-  AppointmentsRoute: typeof AppointmentsRoute
-  ClinicalRoute: typeof ClinicalRouteWithChildren
-  InsuranceRoute: typeof InsuranceRoute
+  CustomersRoute: typeof CustomersRouteWithChildren
   InventoryRoute: typeof InventoryRoute
   InvoicesRoute: typeof InvoicesRouteWithChildren
   LoginRoute: typeof LoginRoute
-  PatientsRoute: typeof PatientsRouteWithChildren
   PaymentsRoute: typeof PaymentsRoute
-  PrescriptionsRoute: typeof PrescriptionsRoute
-  QueueRoute: typeof QueueRoute
+  PurchasesRoute: typeof PurchasesRouteWithChildren
   ReportsRoute: typeof ReportsRoute
+  ServiceRoute: typeof ServiceRoute
   SettingsRoute: typeof SettingsRoute
+  StockRoute: typeof StockRoute
   SuppliersRoute: typeof SuppliersRoute
 }
 
@@ -289,25 +263,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/appointments': {
-      id: '/appointments'
-      path: '/appointments'
-      fullPath: '/appointments'
-      preLoaderRoute: typeof AppointmentsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/clinical': {
-      id: '/clinical'
-      path: '/clinical'
-      fullPath: '/clinical'
-      preLoaderRoute: typeof ClinicalRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/insurance': {
-      id: '/insurance'
-      path: '/insurance'
-      fullPath: '/insurance'
-      preLoaderRoute: typeof InsuranceRouteImport
+    '/customers': {
+      id: '/customers'
+      path: '/customers'
+      fullPath: '/customers'
+      preLoaderRoute: typeof CustomersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/inventory': {
@@ -331,13 +291,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/patients': {
-      id: '/patients'
-      path: '/patients'
-      fullPath: '/patients'
-      preLoaderRoute: typeof PatientsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/payments': {
       id: '/payments'
       path: '/payments'
@@ -345,18 +298,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PaymentsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/prescriptions': {
-      id: '/prescriptions'
-      path: '/prescriptions'
-      fullPath: '/prescriptions'
-      preLoaderRoute: typeof PrescriptionsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/queue': {
-      id: '/queue'
-      path: '/queue'
-      fullPath: '/queue'
-      preLoaderRoute: typeof QueueRouteImport
+    '/purchases': {
+      id: '/purchases'
+      path: '/purchases'
+      fullPath: '/purchases'
+      preLoaderRoute: typeof PurchasesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/reports': {
@@ -366,11 +312,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReportsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/service': {
+      id: '/service'
+      path: '/service'
+      fullPath: '/service'
+      preLoaderRoute: typeof ServiceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/settings': {
       id: '/settings'
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stock': {
+      id: '/stock'
+      path: '/stock'
+      fullPath: '/stock'
+      preLoaderRoute: typeof StockRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/suppliers': {
@@ -380,12 +340,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuppliersRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/clinical/$id': {
-      id: '/clinical/$id'
+    '/customers/$id': {
+      id: '/customers/$id'
       path: '/$id'
-      fullPath: '/clinical/$id'
-      preLoaderRoute: typeof ClinicalIdRouteImport
-      parentRoute: typeof ClinicalRoute
+      fullPath: '/customers/$id'
+      preLoaderRoute: typeof CustomersIdRouteImport
+      parentRoute: typeof CustomersRoute
+    }
+    '/customers/new': {
+      id: '/customers/new'
+      path: '/new'
+      fullPath: '/customers/new'
+      preLoaderRoute: typeof CustomersNewRouteImport
+      parentRoute: typeof CustomersRoute
     }
     '/invoices/$id': {
       id: '/invoices/$id'
@@ -394,33 +361,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvoicesIdRouteImport
       parentRoute: typeof InvoicesRoute
     }
-    '/patients/$id': {
-      id: '/patients/$id'
-      path: '/$id'
-      fullPath: '/patients/$id'
-      preLoaderRoute: typeof PatientsIdRouteImport
-      parentRoute: typeof PatientsRoute
-    }
-    '/patients/new': {
-      id: '/patients/new'
+    '/purchases/new': {
+      id: '/purchases/new'
       path: '/new'
-      fullPath: '/patients/new'
-      preLoaderRoute: typeof PatientsNewRouteImport
-      parentRoute: typeof PatientsRoute
+      fullPath: '/purchases/new'
+      preLoaderRoute: typeof PurchasesNewRouteImport
+      parentRoute: typeof PurchasesRoute
     }
   }
 }
 
-interface ClinicalRouteChildren {
-  ClinicalIdRoute: typeof ClinicalIdRoute
+interface CustomersRouteChildren {
+  CustomersIdRoute: typeof CustomersIdRoute
+  CustomersNewRoute: typeof CustomersNewRoute
 }
 
-const ClinicalRouteChildren: ClinicalRouteChildren = {
-  ClinicalIdRoute: ClinicalIdRoute,
+const CustomersRouteChildren: CustomersRouteChildren = {
+  CustomersIdRoute: CustomersIdRoute,
+  CustomersNewRoute: CustomersNewRoute,
 }
 
-const ClinicalRouteWithChildren = ClinicalRoute._addFileChildren(
-  ClinicalRouteChildren,
+const CustomersRouteWithChildren = CustomersRoute._addFileChildren(
+  CustomersRouteChildren,
 )
 
 interface InvoicesRouteChildren {
@@ -435,35 +397,31 @@ const InvoicesRouteWithChildren = InvoicesRoute._addFileChildren(
   InvoicesRouteChildren,
 )
 
-interface PatientsRouteChildren {
-  PatientsIdRoute: typeof PatientsIdRoute
-  PatientsNewRoute: typeof PatientsNewRoute
+interface PurchasesRouteChildren {
+  PurchasesNewRoute: typeof PurchasesNewRoute
 }
 
-const PatientsRouteChildren: PatientsRouteChildren = {
-  PatientsIdRoute: PatientsIdRoute,
-  PatientsNewRoute: PatientsNewRoute,
+const PurchasesRouteChildren: PurchasesRouteChildren = {
+  PurchasesNewRoute: PurchasesNewRoute,
 }
 
-const PatientsRouteWithChildren = PatientsRoute._addFileChildren(
-  PatientsRouteChildren,
+const PurchasesRouteWithChildren = PurchasesRoute._addFileChildren(
+  PurchasesRouteChildren,
 )
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
-  AppointmentsRoute: AppointmentsRoute,
-  ClinicalRoute: ClinicalRouteWithChildren,
-  InsuranceRoute: InsuranceRoute,
+  CustomersRoute: CustomersRouteWithChildren,
   InventoryRoute: InventoryRoute,
   InvoicesRoute: InvoicesRouteWithChildren,
   LoginRoute: LoginRoute,
-  PatientsRoute: PatientsRouteWithChildren,
   PaymentsRoute: PaymentsRoute,
-  PrescriptionsRoute: PrescriptionsRoute,
-  QueueRoute: QueueRoute,
+  PurchasesRoute: PurchasesRouteWithChildren,
   ReportsRoute: ReportsRoute,
+  ServiceRoute: ServiceRoute,
   SettingsRoute: SettingsRoute,
+  StockRoute: StockRoute,
   SuppliersRoute: SuppliersRoute,
 }
 export const routeTree = rootRouteImport

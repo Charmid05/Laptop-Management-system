@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Panel, Stat, Field, tableCls } from "@/components/kit";
+import { PageHeader, Panel, Field, tableCls } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -12,7 +12,7 @@ import { useDB, createRecord, updateRecord, deleteRecord } from "@/services/stor
 import { Pencil, Plus, Trash2 } from "lucide-react";
 
 export const Route = createFileRoute("/suppliers")({
-  head: () => meta("Suppliers", "Suppliers — Amani Eye practice manager."),
+  head: () => meta("Suppliers", "Laptop and technology suppliers."),
   component: () => (
     <AppShell module="suppliers">
       <Suppliers />
@@ -54,7 +54,6 @@ function Suppliers() {
         .toLowerCase()
         .includes(search.toLowerCase()),
     );
-  const suppliedProducts = db.products.length;
 
   const openNewDialog = () => {
     setEditingId("");
@@ -129,27 +128,12 @@ function Suppliers() {
     <>
       <PageHeader
         title="Suppliers"
-        subtitle={`${db.suppliers.length} suppliers · ${suppliedProducts} inventory products`}
         actions={
           <Button onClick={openNewDialog} className="rounded-full">
             <Plus className="size-4" /> Add supplier
           </Button>
         }
       />
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
-        <Stat
-          label="Suppliers"
-          value={db.suppliers.length}
-          hint="Saved supplier records"
-          accent="info"
-        />
-        <Stat
-          label="Linked products"
-          value={suppliedProducts}
-          hint="Inventory items sourced from suppliers"
-          accent="accent"
-        />
-      </div>
       <Panel>
         <div className="mb-4 max-w-sm">
           <Input
@@ -266,7 +250,7 @@ function Suppliers() {
                 <Input
                   value={draft.productsSupplied}
                   onChange={(event) => setDraft({ ...draft, productsSupplied: event.target.value })}
-                  placeholder="Frames, lenses, solutions"
+                  placeholder="Laptops, components, accessories"
                 />
               </Field>
             </div>

@@ -1,21 +1,32 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { AppShell } from "@/components/AppShell";
-import { PageHeader, Panel, StatusBadge, tableCls, selectCls, Field } from "@/components/kit";
+import { Panel, StatusBadge, tableCls, selectCls, Field } from "@/components/kit";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { meta } from "@/lib/meta";
 import { useDB, createRecord, updateRecord, deleteRecord, uid, nowISO } from "@/services/store";
 import { api } from "@/services/api";
 import { toast } from "sonner";
-import { Plus, Trash2, Shield, Users, FileText, Key } from "lucide-react";
+import { Trash2, Shield, Users, Key, UserRoundPlus } from "lucide-react";
+import type { RoleId } from "@/types";
 
 export const Route = createFileRoute("/admin")({
-  head: () => meta("Administration", "User management and settings — Amani Eye practice manager."),
-  component: () => <AppShell module="administration"><Administration /></AppShell>,
+  head: () => meta("Administration", "Staff access and settings for the laptop store."),
+  component: () => (
+    <AppShell module="administration">
+      <Administration />
+    </AppShell>
+  ),
 });
 
 function Administration() {
@@ -30,7 +41,7 @@ function Administration() {
     email: "",
     username: "",
     phone: "",
-    role: "receptionist" as const,
+    role: "cashier" as const,
     status: "active" as const,
   });
 
@@ -49,7 +60,14 @@ function Administration() {
       });
       toast.success("User created successfully");
       setShowUserDialog(false);
-      setNewUser({ fullName: "", email: "", username: "", phone: "", role: "receptionist", status: "active" });
+      setNewUser({
+        fullName: "",
+        email: "",
+        username: "",
+        phone: "",
+        role: "cashier",
+        status: "active",
+      });
     } catch (error) {
       toast.error("Failed to create user");
       console.error(error);
@@ -74,7 +92,10 @@ function Administration() {
     }
 
     try {
-      await api(`/users/${selectedUser}/password`, { method: "POST", body: { password: newPassword } });
+      await api(`/users/${selectedUser}/password`, {
+        method: "POST",
+        body: { password: newPassword },
+      });
       toast.success("Password changed successfully");
       setShowPasswordDialog(false);
       setNewPassword("");
@@ -96,20 +117,52 @@ function Administration() {
   };
 
   return (
-    <>
-      <PageHeader
-        title="Administration"
-        subtitle="Manage users, roles, and system settings"
-        actions={
+    <div className="admin-page space-y-5">
+      <section className="admin-hero">
+        <div className="admin-hero-content">
+          <div className="admin-eyebrow">
+            <span className="admin-eyebrow-icon">
+              <Shield className="size-4" />
+            </span>
+            ACCESS & SECURITY
+          </div>
+          <h1>Administration</h1>
+          <p>Manage team access, permissions, and system activity.</p>
+          <div className="admin-hero-meta">
+            <span>
+              <Users className="size-3.5" /> {db.users.length} users
+            </span>
+            <span className="admin-meta-divider" />
+            <span>
+              <Shield className="size-3.5" /> {db.roles.length} system roles
+            </span>
+          </div>
+        </div>
+        <div className="admin-hero-art" aria-hidden="true">
+          <div className="admin-art-ring admin-art-ring-one" />
+          <div className="admin-art-ring admin-art-ring-two" />
+          <span>
+            <Shield className="size-10" />
+          </span>
+        </div>
+        <div className="admin-hero-action">
           <Dialog open={showUserDialog} onOpenChange={setShowUserDialog}>
             <DialogTrigger asChild>
-              <Button className="rounded-full"><Plus className="mr-2 size-4" /> Add user</Button>
+              <Button className="admin-add-user rounded-full">
+                <UserRoundPlus className="size-4" /> Add user
+              </Button>
             </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add new user</DialogTitle>
+            <DialogContent className="admin-user-dialog">
+              <DialogHeader className="admin-user-dialog-header">
+                <span className="admin-user-dialog-icon">
+                  <UserRoundPlus className="size-4" />
+                </span>
+                <div>
+                  <DialogTitle>Add new user</DialogTitle>
+                  <p>Create a team account and choose its access level.</p>
+                </div>
               </DialogHeader>
-              <div className="space-y-4">
+              <div className="admin-user-dialog-body">
                 <Field label="Full name *">
                   <Input
                     value={newUser.fullName}
@@ -142,12 +195,10 @@ function Administration() {
                 <Field label="Role *">
                   <select
                     value={newUser.role}
-                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as any })}
+                    onChange={(e) => setNewUser({ ...newUser, role: e.target.value as RoleId })}
                     className={selectCls}
                   >
                     <option value="administrator">Administrator</option>
-                    <option value="receptionist">Receptionist</option>
-                    <option value="optometrist">Optometrist</option>
                     <option value="cashier">Cashier</option>
                     <option value="store_officer">Store Officer</option>
                   </select>
@@ -155,32 +206,36 @@ function Administration() {
                 <Field label="Status *">
                   <select
                     value={newUser.status}
-                    onChange={(e) => setNewUser({ ...newUser, status: e.target.value as any })}
+                    onChange={(e) =>
+                      setNewUser({ ...newUser, status: e.target.value as "active" | "disabled" })
+                    }
                     className={selectCls}
                   >
                     <option value="active">Active</option>
                     <option value="disabled">Disabled</option>
                   </select>
                 </Field>
-                <div className="flex gap-3 justify-end">
-                  <Button variant="outline" onClick={() => setShowUserDialog(false)}>Cancel</Button>
+                <div className="admin-user-dialog-actions">
+                  <Button variant="outline" onClick={() => setShowUserDialog(false)}>
+                    Cancel
+                  </Button>
                   <Button onClick={handleCreateUser}>Create user</Button>
                 </div>
               </div>
             </DialogContent>
           </Dialog>
-        }
-      />
+        </div>
+      </section>
 
-      <Tabs defaultValue="users" className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue="users" className="admin-tabs space-y-5">
+        <TabsList className="admin-tabs-list">
           <TabsTrigger value="users">Users</TabsTrigger>
           <TabsTrigger value="roles">Roles</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
-          <Panel title="System users">
+          <Panel title="System users" className="admin-panel">
             {db.users.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No users found</p>
             ) : (
@@ -208,14 +263,21 @@ function Administration() {
                           <td>{user.email}</td>
                           <td>{user.phone}</td>
                           <td>{role?.name || user.role}</td>
-                          <td><StatusBadge status={user.status} /></td>
-                          <td>{user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}</td>
+                          <td>
+                            <StatusBadge status={user.status} />
+                          </td>
+                          <td>
+                            {user.lastLogin ? new Date(user.lastLogin).toLocaleString() : "Never"}
+                          </td>
                           <td>
                             <div className="flex gap-2">
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => { setSelectedUser(user.id); setShowPasswordDialog(true); }}
+                                onClick={() => {
+                                  setSelectedUser(user.id);
+                                  setShowPasswordDialog(true);
+                                }}
                               >
                                 <Key className="size-4" />
                               </Button>
@@ -259,25 +321,33 @@ function Administration() {
         </TabsContent>
 
         <TabsContent value="roles">
-          <Panel title="System roles and permissions">
+          <Panel title="System roles and permissions" className="admin-panel">
             {db.roles.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No roles found</p>
             ) : (
               <div className="space-y-4">
                 {db.roles.map((role) => (
-                  <div key={role.id} className="rounded-xl border bg-card p-4">
+                  <div key={role.id} className="admin-role-card">
                     <div className="flex items-start justify-between">
                       <div>
                         <h3 className="font-semibold text-lg">{role.name}</h3>
                         <p className="text-sm text-muted-foreground mt-1">{role.description}</p>
                       </div>
-                      <StatusBadge status={role.id === "administrator" ? "active" : "info"} text={role.id} />
+                      <StatusBadge
+                        status={role.id === "administrator" ? "active" : "info"}
+                        text={role.id}
+                      />
                     </div>
                     <div className="mt-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">Permissions</p>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                        Permissions
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {role.modules.map((module) => (
-                          <span key={module} className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                          <span
+                            key={module}
+                            className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium"
+                          >
                             {module}
                           </span>
                         ))}
@@ -291,7 +361,7 @@ function Administration() {
         </TabsContent>
 
         <TabsContent value="audit">
-          <Panel title="Audit log">
+          <Panel title="Audit log" className="admin-panel">
             {db.audit.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No audit entries found</p>
             ) : (
@@ -330,11 +400,17 @@ function Administration() {
       </Tabs>
 
       <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Change password</DialogTitle>
+        <DialogContent className="admin-user-dialog">
+          <DialogHeader className="admin-user-dialog-header">
+            <span className="admin-user-dialog-icon">
+              <Key className="size-4" />
+            </span>
+            <div>
+              <DialogTitle>Change password</DialogTitle>
+              <p>Set a new password for the selected user.</p>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="admin-user-dialog-body">
             <Field label="New password *">
               <Input
                 type="password"
@@ -343,13 +419,15 @@ function Administration() {
                 placeholder="Enter new password (min 4 characters)"
               />
             </Field>
-            <div className="flex gap-3 justify-end">
-              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>Cancel</Button>
+            <div className="admin-user-dialog-actions">
+              <Button variant="outline" onClick={() => setShowPasswordDialog(false)}>
+                Cancel
+              </Button>
               <Button onClick={handleChangePassword}>Change password</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }
