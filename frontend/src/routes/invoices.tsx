@@ -64,7 +64,9 @@ function Invoices() {
   const [taxRate, setTaxRate] = useState(db.settings.taxRate);
   const [saving, setSaving] = useState(false);
 
-  const invoices = [...db.invoices].sort((a, b) => b.date.localeCompare(a.date));
+  const invoices = [...db.invoices].sort(
+    (a, b) => b.date.localeCompare(a.date) || b.createdAt.localeCompare(a.createdAt),
+  );
   const filteredInvoices = invoices.filter((invoice) => {
     const customer = db.customers.find((item) => item.id === invoice.customerId);
     const serialNumbers = invoice.items.flatMap((item) => item.serialNumbers ?? []).join(" ");
