@@ -72,4 +72,8 @@ The initial administrator is `admin` with password `1234`. Set `ADMIN_PASSWORD` 
 cd frontend
 npm run build
 npm run lint
+
+
+THIS PROJECT WAS BUILD BY KHAMIS SALIM AZIZ AND SHALL REMAIN HIS PROPERTY @ALL RIGHTS RESERVED
+
 ```
